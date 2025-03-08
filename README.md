@@ -1,5 +1,9 @@
 # bls_cuda
-An implementation of Box-Least-Squares transit search using CUDA
+An implementation of Box-Least-Squares transit search using CUDA.
+
+How does it work:
+
+The idea is to send a few thousand jobs at a time to the GPU.  We loop through tossing blocks of frequencies to compute BLS at and collecting the results as we good.  I've tested with Kepler data scanning over 700~000 frequencies from 0.5 days to the length of the dataset without issues.  You can't just assign one frequency per thread or you will quickly run out of VRAM.  
 
 ## Getting Started
 To get started with this project, follow these steps:
