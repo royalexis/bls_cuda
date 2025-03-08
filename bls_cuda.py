@@ -1,8 +1,12 @@
+import os
+
 import numpy as np
+
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 from matplotlib import ticker
 import matplotlib.gridspec as gridspec
+
 from tqdm import tqdm
 
 from numba import jit #We will attempt to precompile some routines
@@ -161,7 +165,7 @@ def bls(gbls_inputs):
         calc_eph(p, jn1, jn2, npt, time, flux, freqs, ofac, nstep, nb, mintime, Keptime)
     if gbls_inputs.plots > 0:
         makeplot(periods, power, time, flux, mintime, Keptime, epo, bper, bpower, snr, tdur, depth, \
-                gbls_inputs.filename, gbls_inputs.plots)
+                filename, gbls_inputs.plots)
 
     gbls_ans = gbls_ans_class()
     gbls_ans.epo    = epo
@@ -540,16 +544,36 @@ def makeplot(periods, power, time, flux, mintime, Keptime, epo, bper, bpower, sn
             axn.plot(x, y, color = 'black')
     
     fig.tight_layout()
-    if plots == 2:
-        filename_without_extension = ".".join(filename.split(".")[:-1])
-        fig.savefig(filename_without_extension+".png", dpi=150)
+    if plots == 2:        
+        directory = os.path.dirname(filename)
+        filename_without_extension, file_extension = os.path.splitext(os.path.basename(filename))
+
+        if is_writable(directory):
+            filename_without_extension = ".".join(filename.split(".")[:-1])
+            fig.savefig(filename_without_extension+".png", dpi=150)
+        else:
+            print("Warning: Path to datafile not writable, attempting to make plot in current directory")
+            fig.savefig(filename_without_extension+".png", dpi=150)
+        plt.show()
+
     elif plots == 3:
-        filename_without_extension = ".".join(filename.split(".")[:-1])
-        fig.savefig(filename_without_extension+".png", dpi=150)
+        directory = os.path.dirname(filename)
+        filename_without_extension, file_extension = os.path.splitext(os.path.basename(filename))
+
+        if is_writable(directory):
+            filename_without_extension = ".".join(filename.split(".")[:-1])
+            fig.savefig(filename_without_extension+".png", dpi=150)
+        else:
+            print("Warning: Path to datafile not writable, attempting to make plot in current directory")
+            fig.savefig(filename_without_extension+".png", dpi=150)
         plt.close(fig)
+
     else:
         plt.show()
-    
+        
+def is_writable(directory):
+    return os.access(directory, os.W_OK)
+        
 def calc_eph(p, jn1, jn2, npt, time, flux, freqs, ofac, nstep, nb, mintime, Keptime):
 
     periods = 1/freqs # periods (days)
