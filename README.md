@@ -13,8 +13,8 @@ To get started with this project, follow these steps:
 
 ## Commandline Usage
 1. Make sure transitfind5_gpu.py is executable
-2. `./transitfind5_gpu.py filename.txt`
-3. filename.txt is a simple space delimited file with time and flux in two columns.
+2. `./transitfind5_gpu.py tlc29991541_5.d.dat`
+3. The input file is a simple space delimited file with time and flux in two columns.
 4. if everything works, then a plot should show up showing the results of your search
 5. try: `./transitfind5_gpu.py` to see command usage
 
