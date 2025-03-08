@@ -25,9 +25,13 @@ If you'd like to contribute to this project, go for it! There are a number of to
 This project is licensed under the GNU General Public License (GPL) version 3 or later.
 
 ## Acknowledgments
-Thank you to Canada Research Chairs, NSERC Discovery, Digital Alliance Canada, Calcul Quebec, FRQNT for their contributions and support.
+Thank you to Canada Research Chairs, NSERC Discovery, Digital Alliance Canada, Calcul Quebec, FRQNT for financial and hardware support.
 
 This code was initially developed during the Bishop's University Winter Reading Week, making good use of profession development resources. 
+
+If you find these codes useful please reference:
+Rowe et al. 2014 ApJ, 784, 45  
+Rowe et al. 2015 ApJs, 217, 16
 
 ## Change Log
 2025/03/08 : Initial Update
