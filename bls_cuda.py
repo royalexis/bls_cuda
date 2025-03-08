@@ -368,7 +368,7 @@ def makeplot(periods, power, time, flux, mintime, Keptime, epo, bper, bpower, sn
     rcParams['font.family'] = 'monospace'
 
     # Create a figure and three subplots
-    fig = plt.figure(figsize=(12,16))
+    fig = plt.figure(figsize=(10,10))
     gs = gridspec.GridSpec(4, 1, height_ratios=[1, 1, 1, 1])
 
     # Create subplots
@@ -377,7 +377,7 @@ def makeplot(periods, power, time, flux, mintime, Keptime, epo, bper, bpower, sn
     ax3 = plt.subplot(gs[2])
     
     # Split the last row into two columns
-    gs4 = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs[3], width_ratios=[1, 2.0])
+    gs4 = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs[3], width_ratios=[1, 1.5])
     
     ax4a = plt.subplot(gs4[0])
     ax4b = plt.subplot(gs4[1])
