@@ -27,5 +27,7 @@ This project is licensed under the GNU General Public License (GPL) version 3 or
 ## Acknowledgments
 Thank you to Canada Research Chairs, NSERC Discovery, Digital Alliance Canada, Calcul Quebec, FRQNT for their contributions and support.
 
+This code was initially developed during the Bishop's University Winter Reading Week, making good use of profession development resources. 
+
 ## Change Log
 2025/03/08 : Initial Update
