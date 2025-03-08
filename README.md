@@ -33,6 +33,8 @@ Thank you to Canada Research Chairs, NSERC Discovery, Digital Alliance Canada, C
 
 This code was initially developed during the Bishop's University Winter Reading Week, making good use of profession development resources. 
 
+This code is directly adopted from Kovacs et al. 2002 : A box-fitting algorithm in the search for periodic transits 
+
 If you find these codes useful please reference:  
 Rowe et al. 2014 ApJ, 784, 45   
 Rowe et al. 2015 ApJs, 217, 16  
