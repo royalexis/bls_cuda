@@ -13,8 +13,8 @@ To get started with this project, follow these steps:
 
 ## Commandline Usage
 1. Make sure transitfind5_gpu.py is executable
-2. `./transitfind5_gpu.py filename.txt`
-3. filename.txt is a simple space delimited file with time and flux in two columns.
+2. `./transitfind5_gpu.py tlc29991541_5.d.dat`
+3. The input file is a simple space delimited file with time and flux in two columns.
 4. if everything works, then a plot should show up showing the results of your search
 5. try: `./transitfind5_gpu.py` to see command usage
 
@@ -32,6 +32,8 @@ This project is licensed under the GNU General Public License (GPL) version 3 or
 Thank you to Canada Research Chairs, NSERC Discovery, Digital Alliance Canada, Calcul Quebec, FRQNT for financial and hardware support.
 
 This code was initially developed during the Bishop's University Winter Reading Week, making good use of profession development resources. 
+
+This code is directly adopted from Kovacs et al. 2002 : A box-fitting algorithm in the search for periodic transits 
 
 If you find these codes useful please reference:  
 Rowe et al. 2014 ApJ, 784, 45   
