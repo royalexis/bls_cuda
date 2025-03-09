@@ -87,7 +87,10 @@ def bls(gbls_inputs):
     
     #Calculate the number of steps needed to scan the frequency range 
     nstep = calc_nsteps_cpu(Mstar, Rstar, freq1, freq2, nyq, ofac, npt, df0, nb, minbin)
-    print(nstep, nper)
+
+    #no need to break up runs
+    nper = nstep
+    #print(nstep, nper)
     
     #Calculate the frequencies that we will be folding at
     freqs = calc_freqs_cpu(nstep, Mstar, Rstar, freq1, freq2, nyq, ofac, npt, df0, nb, minbin)
@@ -118,12 +121,14 @@ def bls(gbls_inputs):
     jn1   = np.zeros_like(freqs, dtype=np.int32)
     jn2   = np.zeros_like(freqs, dtype=np.int32)
 
-    for i in tqdm(range(0, nstep, nper)):
+    # for i in tqdm(range(0, nstep, nper)):
+    for i in range(0, nstep, nper):
         batch_freqs = freqs[i:i + nper]
         batch_power = p[i:i + nper]
         batch_jn1   = jn1[i:i + nper]
         batch_jn2   = jn2 [i:i + nper]
         bpower, bjn1, bjn2 = compute_bls(batch_freqs, batch_power, batch_jn1, batch_jn2, time_g, flux_g, const_g, dconst_g)
+        cuda.synchronize()
     
         p[i:i + nper] = bpower[:]
         jn1[i:i + nper]   = bjn1[:]
