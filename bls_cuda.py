@@ -106,6 +106,11 @@ def bls(gbls_inputs):
     #Set up threading -- this needs some real thought.  
     threads_per_block = 512 #for 1080ti the max is 1024, be a multiple of 32
     blocks_per_grid = 256
+    
+    # threads_per_block = 1024
+    # blocks_per_grid_f = (nper + (threads_per_block - 1)) // threads_per_block
+    # blocks_per_grid_t = (npt + (threads_per_block - 1)) // threads_per_block
+    # blocks_per_grid_nb = int( (nb + (threads_per_block - 1)) // threads_per_block )
     # nper = 10000 #this is the number of frequencies to compute at a time on the GPU, will be GPU-Mem limited.
     
     #rough estimate of memory usage
@@ -573,6 +578,29 @@ def makeplot(periods, power, time, flux, mintime, Keptime, epo, bper, bpower, sn
         
 def is_writable(directory):
     return os.access(directory, os.W_OK)
+
+@jit(nopython=True)
+def running_std_with_filter(data, half_window):
+    # Calculate the overall standard deviation
+    std = np.std(data)
+    
+    # Initialize an array to store the running standard deviations
+    running_std = np.empty(len(data))
+    
+    # Iterate over each element in the data
+    for i in range(len(data)):
+        # Define the start and end indices of the window
+        start_idx = max(0, i - half_window)
+        end_idx = min(len(data), i + half_window + 1)
+        
+        # Extract the window and filter values less than 3 * std
+        window_data = data[start_idx:end_idx]
+        filtered_data = window_data[window_data < 3 * std]
+        
+        # Calculate the standard deviation of the filtered window
+        running_std[i] = np.std(filtered_data)
+    
+    return running_std
         
 def calc_eph(p, jn1, jn2, npt, time, flux, freqs, ofac, nstep, nb, mintime, Keptime):
 
@@ -584,12 +612,13 @@ def calc_eph(p, jn1, jn2, npt, time, flux, freqs, ofac, nstep, nb, mintime, Kept
     data = np.sqrt(p) - filtered
     std = np.std(data)
     half_window = width 
-    running_std = np.array([\
-        np.std(data[max(0, i - half_window): min(len(data), i + half_window + 1)]\
-               [data[max(0, i - half_window): min(len(data), i + half_window + 1)] < 3 * std] 
-              )\
-        for i in range(len(data))\
-    ])
+    # running_std = np.array([\
+    #     np.std(data[max(0, i - half_window): min(len(data), i + half_window + 1)]\
+    #            [data[max(0, i - half_window): min(len(data), i + half_window + 1)] < 3 * std] 
+    #           )\
+    #     for i in range(len(data))\
+    # ])
+    running_std = running_std_with_filter(data, half_window)
 
     power = (np.sqrt(p) - filtered)/running_std # This is our BLS statistic array for each frequency/period
 
