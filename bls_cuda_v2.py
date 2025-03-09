@@ -36,7 +36,7 @@ class gbls_inputs_class:
         self.ofac     = 8.0
         self.Mstar    = 1.0
         self.Rstar    = 1.0
-        self.nper     = 5000
+        self.nper     = 50000
         self.minbin   = 5
         self.plots    = 1    # 0 = no plots, 1 = X11, 2 = PNG+X11, 3 = PNG
 
