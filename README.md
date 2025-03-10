@@ -24,9 +24,9 @@ To get started with this project, follow these steps:
 ## Contributing
 If you'd like to contribute to this project, go for it! There are a number of to-dos 
 1. Code speed can likely be made much faster.  (shared memory vs global memory)
-2. Better choices of blocks and threads-per-block needs to be explored
+2. ~~Better choices of blocks and threads-per-block needs to be explored~~
 3. Making the code base into an installable package
-4. Make CPU threading more efficient (spread around short-period jobs that take longer)
+4. ~~Make CPU threading more efficient (spread around short-period jobs that take longer)~~
 5. and much more.. 
 
 ## License
