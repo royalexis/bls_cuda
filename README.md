@@ -18,12 +18,16 @@ To get started with this project, follow these steps:
 4. if everything works, then a plot should show up showing the results of your search
 5. try: `./transitfind5_gpu.py` to see command usage
 
+## CPU Version
+1. You can use `transitfind5_cpu.py` if you want CPU based BLS.
+
 ## Contributing
 If you'd like to contribute to this project, go for it! There are a number of to-dos 
 1. Code speed can likely be made much faster.  (shared memory vs global memory)
 2. Better choices of blocks and threads-per-block needs to be explored
 3. Making the code base into an installable package
-4. and much more.. 
+4. Make CPU threading more efficient (spread around short-period jobs that take longer)
+5. and much more.. 
 
 ## License
 This project is licensed under the GNU General Public License (GPL) version 3 or later.
@@ -40,5 +44,6 @@ Rowe et al. 2014 ApJ, 784, 45
 Rowe et al. 2015 ApJs, 217, 16  
 
 ## Change Log
-2025/03/08 : Initial Update
+2025/03/08 : Initial Update  
 2025/03/08 : Added a 'V2'.  V2 works best with TESS CVZ lc, V1 works best with Kepler.  
+2025/03/08 : Added CPU version (Numba + threading)
