@@ -576,17 +576,23 @@ def bls(gbls_inputs):
         jn1 = np.zeros((max_processes, ndiv), dtype=np.int32)
         jn2 = np.zeros((max_processes, ndiv), dtype=np.int32)
     
-        iarg = np.zeros((max_processes - 1, 2), dtype = np.int32)
-        npro = 0
-        for i in range(0, nstep, ndiv):
-            i1 = i
-            i2 = np.min((nstep,i+ndiv))
-            iarg[npro, 0] = i1
-            iarg[npro, 1] = i2
-            npro += 1
+        # iarg = np.zeros((max_processes - 1, 2), dtype = np.int32)
+        # npro = 0
+        # for i in range(0, nstep, ndiv):
+        #     i1 = i
+        #     i2 = np.min((nstep,i+ndiv))
+        #     iarg[npro, 0] = i1
+        #     iarg[npro, 1] = i2
+        #     npro += 1
+
+        iarg = np.zeros((max_processes, ndiv), dtype = np.int32)
+        for i in range(0, max_processes):
+            for k,j in enumerate(range(i, nstep, max_processes)):
+                iarg[i, k] = j
     
         with concurrent.futures.ProcessPoolExecutor(max_workers=max_processes) as executor:
-            futures = {executor.submit(compute_bls_kernel, iarg[i], freqs, time, flux, nb, Rstar, Mstar, ndiv): i for i in range(npro)}
+            futures = {executor.submit(compute_bls_kernel, iarg[i], freqs, time, flux, \
+                                       nb, Rstar, Mstar, ndiv): i for i in range(iarg.shape[0])}
             
             for future in concurrent.futures.as_completed(futures):
                 i = futures[future]
@@ -596,9 +602,9 @@ def bls(gbls_inputs):
                 except Exception as exc:
                     print(f'Generated an exception: {exc}')
     
-        p = p.ravel()[0:nstep]
-        jn1 = jn1.ravel()[0:nstep]
-        jn2 = jn2.ravel()[0:nstep]
+        p = p.T.ravel()[0:nstep]
+        jn1 = jn1.T.ravel()[0:nstep]
+        jn2 = jn2.T.ravel()[0:nstep]
     
     periods, power, bper, epo, bpower, snr, tdur, depth = \
         calc_eph(p, jn1, jn2, npt, time, flux, freqs, ofac, nstep, nb, mintime, Keptime)
@@ -617,16 +623,13 @@ def bls(gbls_inputs):
     return gbls_ans
 
 def compute_bls_kernel(iarg, freqs, time, flux, nb, Rstar, Mstar, ndiv):
-
-    i1 = iarg[0]
-    i2 = iarg[1]
     
     p   = np.zeros((ndiv))
     jn1 = np.zeros((ndiv), dtype = np.int32)
     jn2 = np.zeros((ndiv), dtype = np.int32)
 
     j = 0
-    for i in range(i1, i2):
+    for i in iarg:
         p[j], jn1[j], jn2[j] = bls_kernel(freqs[i], time, flux, nb, Rstar, Mstar)
         j += 1
     
