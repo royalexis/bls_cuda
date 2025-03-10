@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
-import bls_cuda_v1 as gbls
+import bls_cuda_v2 as gbls
 
 def print_usage():
     
