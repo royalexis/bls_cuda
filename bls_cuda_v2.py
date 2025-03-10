@@ -87,10 +87,14 @@ def bls(gbls_inputs):
     
     #Calculate the number of steps needed to scan the frequency range 
     nstep = calc_nsteps_cpu(Mstar, Rstar, freq1, freq2, nyq, ofac, npt, df0, nb, minbin)
+    print("freqs: ", freq1, freq2)
+    print("nstep: ", nstep) 
 
     #no need to break up runs
-    nper = nstep
+    # nper = nstep
     #print(nstep, nper)
+    if nper <= 0:
+        nper = nstep
     
     #Calculate the frequencies that we will be folding at
     freqs = calc_freqs_cpu(nstep, Mstar, Rstar, freq1, freq2, nyq, ofac, npt, df0, nb, minbin)
@@ -618,8 +622,8 @@ def compute_bls(freqs, power, jn1, jn2, time_g, flux_g, const_g, dconst_g):
     n_freqs = len(freqs)
 
     # Define the CUDA block and grid sizes
-    threads_per_block = 128
-    blocks_per_grid = (n_freqs + (threads_per_block - 1)) // threads_per_block
+    threads_per_block = 128 # make a mulitple of 32
+    blocks_per_grid   = 128 # (n_freqs + (threads_per_block - 1)) // threads_per_block
 
     # Allocate memory on the device
     freqs_g = cuda.to_device(freqs)
@@ -640,12 +644,15 @@ def compute_bls(freqs, power, jn1, jn2, time_g, flux_g, const_g, dconst_g):
 @cuda.jit
 def bls_kernel(time_g, flux_g, const_g, dconst_g, freqs_g, power_g, jn1_g, jn2_g):
 
-    tx = cuda.threadIdx.x
-    bx = cuda.blockIdx.x
-    bw = cuda.blockDim.x
+    # tx = cuda.threadIdx.x
+    # bx = cuda.blockIdx.x
+    # bw = cuda.blockDim.x
     
-    # Calculate global index
-    nk = tx + bx * bw
+    # # Calculate global index
+    # nk = tx + bx * bw
+
+    start = cuda.grid(1)      # 1 = one dimensional thread grid, returns a single value
+    stride = cuda.gridsize(1) # ditto
 
     npt = const_g[1]      # put number of data points in register
     nb1 = const_g[0] - 1  # nb - 1
@@ -662,74 +669,87 @@ def bls_kernel(time_g, flux_g, const_g, dconst_g, freqs_g, power_g, jn1_g, jn2_g
     Mstar = dconst_g[0]
     Rstar = dconst_g[1]
 
-    if nk >= freqs_g.size:
-        return
-        
-    freq = freqs_g[nk]
+    # ibi = cuda.local.array((1024, 4000), dtype=np.int32)
+    # y   = cuda.local.array((1024, 4000), dtype=np.float64)
 
     #4000 = nb * 2.  So if nb changes, we need to change this
     ibi = cuda.local.array(4000, dtype=np.int32)
     y   = cuda.local.array(4000, dtype=np.float64)
+
+    for nk in range(start, freqs_g.shape[0], stride):
+
+        # if nk >= freqs_g.size:
+        #     return
+            
+        freq = freqs_g[nk]
     
-    for i in range(npt):
+        # #4000 = nb * 2.  So if nb changes, we need to change this
+        # ibi = cuda.local.array(4000, dtype=np.int32)
+        # y   = cuda.local.array(4000, dtype=np.float64)
 
-        phase = time_g[i]*freq - int(time_g[i]*freq)
-        j = int(phase * nb1)
-
-        ibi[j] += 1
-        y[j]   += flux_g[i]
-
-    #duplicate array
-    for i in range(nb):
-        ibi[i+nb] = ibi[i]
-        y[i+nb]   = y[i]
-
-    fsec = freq / day2sec
-    q = pifac * Rstar*Rsun / (G*Mstar*Msun)**(1.0/3.0) * fsec**(2.0/3.0)
-
-    qmi = q / 2.0
-    if qmi < onehour*freq:
-        qmi = onehour*freq
-
-    qma = q * 2.0
-    if qma > 0.25:
-        qma = 0.25
-
-    if qmi > qma:
-        qma = qmi * 2.0
-        if qma > 0.4:
-            qma = 0.4
-
-    kmi = int(qmi * nb)
-    if kmi < 1:
-        kmi = 1
-    kma = int(qma * nb) + 1
-    kkmi = int(npt * qmi)
-    if kkmi < 5: #minbin
-        kkmi = 5
-    nbkma = nb + kma
-
-    power = 0
-
-    for i in range(nb):
-        s = 0.0
-        k = 0
-        kk = 0
-        nb2 = i + kma + 1
-
-        for j in range(i, nb2):
-            k  = k + 1
-            kk = kk + ibi[j]
-            s  = s  + y[j]
-
-            if k > kmi and kk > kkmi:
-                dfac = (kk * (npt - kk)) #const[1] = npt
-                if dfac > 0 :
-                    pow1 = s*s / dfac
-                    old_max = cuda.atomic.max(power_g, nk, pow1)
-                    if pow1 > old_max:
-                        cuda.atomic.exch(jn1_g, nk, i)
-                        cuda.atomic.exch(jn2_g, nk, j)
+        for i in range(2000):
+            ibi[i] = 0
+            y[i]   = 0.0
+        
+        for i in range(npt):
+    
+            phase = time_g[i]*freq - int(time_g[i]*freq)
+            j = int(phase * nb1)
+    
+            ibi[j] += 1
+            y[j]   += flux_g[i]
+    
+        #duplicate array
+        for i in range(nb):
+            ibi[i+nb] = ibi[i]
+            y[i+nb]   = y[i]
+    
+        fsec = freq / day2sec
+        q = pifac * Rstar*Rsun / (G*Mstar*Msun)**(1.0/3.0) * fsec**(2.0/3.0)
+    
+        qmi = q / 2.0
+        if qmi < onehour*freq:
+            qmi = onehour*freq
+    
+        qma = q * 2.0
+        if qma > 0.25:
+            qma = 0.25
+    
+        if qmi > qma:
+            qma = qmi * 2.0
+            if qma > 0.4:
+                qma = 0.4
+    
+        kmi = int(qmi * nb)
+        if kmi < 1:
+            kmi = 1
+        kma = int(qma * nb) + 1
+        kkmi = int(npt * qmi)
+        if kkmi < 5: #minbin
+            kkmi = 5
+        nbkma = nb + kma
+    
+        power = 0
+    
+        for i in range(nb):
+            s = 0.0
+            k = 0
+            kk = 0
+            nb2 = i + kma + 1
+    
+            for j in range(i, nb2):
+                k  = k + 1
+                kk = kk + ibi[j]
+                s  = s  + y[j]
+    
+                if k > kmi and kk > kkmi:
+                    dfac = (kk * (npt - kk)) #const[1] = npt
+                    if dfac > 0 :
+                        pow1 = s*s / dfac
+                        old_max = cuda.atomic.max(power_g, nk, pow1)
+                        if pow1 > old_max:
+                            cuda.atomic.exch(jn1_g, nk, i)
+                            cuda.atomic.exch(jn2_g, nk, j)
 
 
 
