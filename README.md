@@ -47,3 +47,4 @@ Rowe et al. 2015 ApJs, 217, 16
 2025/03/08 : Initial Update  
 2025/03/08 : Added a 'V2'.  V2 works best with TESS CVZ lc, V1 works best with Kepler.  
 2025/03/08 : Added CPU version (Numba + threading)
+2025/03/08 : V2 is now faster for CPU
