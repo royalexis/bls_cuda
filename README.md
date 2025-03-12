@@ -20,6 +20,8 @@ To get started with this project, follow these steps:
 
 ## CPU Version
 1. You can use `transitfind5_cpu.py` if you want CPU based BLS.
+2. The CPU version will distribute work equally amongst as many CPU cores that are available.  Works very well.
+3. For many machines the CPU version will compete with the GPU version.
 
 ## Contributing
 If you'd like to contribute to this project, go for it! There are a number of to-dos 
