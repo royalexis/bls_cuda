@@ -49,7 +49,7 @@ class gbls_ans_class:
         self.tdur     = 8.0
         self.depth    = 1.0
 
-def bls(gbls_inputs, time = [0], flux = [0]):
+def bls(gbls_inputs, time = np.array([0]), flux = np.array([0])):
 
     if gbls_inputs.lcdir == "":
         filename = gbls_inputs.filename

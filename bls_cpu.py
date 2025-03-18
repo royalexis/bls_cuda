@@ -510,7 +510,7 @@ def calc_eph(p, jn1, jn2, npt, time, flux, freqs, ofac, nstep, nb, mintime, Kept
 
     return periods, power, bper, epo, bpower, snr, tdur, depth
 
-def bls(gbls_inputs, time = [0], flux = [0]):
+def bls(gbls_inputs, time = np.array([0]), flux = np.array([0])):
 
     if gbls_inputs.lcdir == "":
         filename = gbls_inputs.filename
