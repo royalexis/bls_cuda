@@ -510,7 +510,7 @@ def calc_eph(p, jn1, jn2, npt, time, flux, freqs, ofac, nstep, nb, mintime, Kept
 
     return periods, power, bper, epo, bpower, snr, tdur, depth
 
-def bls(gbls_inputs, time = None, flux = None):
+def bls(gbls_inputs, time = [0], flux = [0]):
 
     if gbls_inputs.lcdir == "":
         filename = gbls_inputs.filename
@@ -526,7 +526,7 @@ def bls(gbls_inputs, time = None, flux = None):
     nper     = gbls_inputs.nper
     multipro = gbls_inputs.multipro
     
-    if (time == None) or (flux == None):
+    if (time.shape[0] < 2) or (flux.shape[0] < 2):
         time, flux = readfile(filename)
         
     #Simple transform of time and flux arrays
