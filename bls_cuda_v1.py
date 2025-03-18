@@ -49,7 +49,7 @@ class gbls_ans_class:
         self.tdur     = 8.0
         self.depth    = 1.0
 
-def bls(gbls_inputs):
+def bls(gbls_inputs, time = [0], flux = [0]):
 
     if gbls_inputs.lcdir == "":
         filename = gbls_inputs.filename
@@ -64,7 +64,9 @@ def bls(gbls_inputs):
     minbin   = gbls_inputs.minbin
     nper     = gbls_inputs.nper
     
-    time, flux = readfile(filename)
+    if (time.shape[0] < 2) or (flux.shape[0] < 2):
+        time, flux = readfile(filename)
+        
     #Simple transform of time and flux arrays
     mintime = np.min(time)
     time = time - mintime #time starts at zero
@@ -104,8 +106,8 @@ def bls(gbls_inputs):
     const_g  = cuda.to_device(const)
     
     #Set up threading -- this needs some real thought.  
-    # threads_per_block = 512 #for 1080ti the max is 1024, be a multiple of 32
-    # blocks_per_grid = 256
+    threads_per_block_default = 512 #for 1080ti the max is 1024, be a multiple of 32
+    blocks_per_grid_default   = 256
 
     # print("nper, nstep, npt, nb", nper, nstep, npt, nb)
     threads_per_block = 32
@@ -150,7 +152,7 @@ def bls(gbls_inputs):
         init_zeros[blocks_per_grid_z, threads_per_block_z](y_g)   #initialize worker arrays to zero
         init_zeros[blocks_per_grid_z, threads_per_block_z](ibi_g)
         compute_phase[blocks_per_grid_ph, threads_per_block](freqs_g, time_g, flux_g, idx_g, const_g, y_g, ibi_g) #phase-folding
-        compute_dup_yibi[blocks_per_grid_du, threads_per_block](y_g, ibi_g, const_g, idx_g)                       #memory copy
+        compute_dup_yibi[blocks_per_grid_default, threads_per_block_default](y_g, ibi_g, const_g, idx_g)                       #memory copy
         compute_bls_stat[blocks_per_grid_bl, threads_per_block](p_g, jn1_g, jn2_g, rn3_g, y_g, ibi_g, kmis_g, idx_g, const_g) #BLS
         #cuda.synchronize()
         #input()

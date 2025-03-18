@@ -36,7 +36,7 @@ class gbls_inputs_class:
         self.ofac     = 8.0
         self.Mstar    = 1.0
         self.Rstar    = 1.0
-        self.nper     = 50000
+        self.nper     = -1
         self.minbin   = 5
         self.plots    = 1    # 0 = no plots, 1 = X11, 2 = PNG+X11, 3 = PNG
 
@@ -49,7 +49,7 @@ class gbls_ans_class:
         self.tdur     = 8.0
         self.depth    = 1.0
 
-def bls(gbls_inputs):
+def bls(gbls_inputs, time = [0], flux = [0]):
 
     if gbls_inputs.lcdir == "":
         filename = gbls_inputs.filename
@@ -64,7 +64,9 @@ def bls(gbls_inputs):
     minbin   = gbls_inputs.minbin
     nper     = gbls_inputs.nper
     
-    time, flux = readfile(filename)
+    if (time.shape[0] < 2) or (flux.shape[0] < 2):
+        time, flux = readfile(filename)
+        
     #Simple transform of time and flux arrays
     mintime = np.min(time)
     time = time - mintime #time starts at zero
@@ -644,20 +646,18 @@ def compute_bls(freqs, power, jn1, jn2, time_g, flux_g, const_g, dconst_g):
 @cuda.jit
 def bls_kernel(time_g, flux_g, const_g, dconst_g, freqs_g, power_g, jn1_g, jn2_g):
 
-    # tx = cuda.threadIdx.x
-    # bx = cuda.blockIdx.x
-    # bw = cuda.blockDim.x
-    
-    # # Calculate global index
-    # nk = tx + bx * bw
-
     start = cuda.grid(1)      # 1 = one dimensional thread grid, returns a single value
-    stride = cuda.gridsize(1) # ditto
+    stride = cuda.gridsize(1) # 
 
-    npt = const_g[1]      # put number of data points in register
     nb1 = const_g[0] - 1  # nb - 1
     nb  = const_g[0]      # nb
+    npt = const_g[1]      # put number of data points in register
     
+    #Stellar parameters
+    Mstar = dconst_g[0]
+    Rstar = dconst_g[1]
+
+    #Physical Constants
     G       = dconst_g[2]   # N m^2 kg^-2  Gravitation constant
     Rsun    = dconst_g[3]   # m  radius of Sun
     Msun    = dconst_g[4]   # kg  mass of Sun
@@ -665,34 +665,23 @@ def bls_kernel(time_g, flux_g, const_g, dconst_g, freqs_g, power_g, jn1_g, jn2_g
     day2sec = dconst_g[6]   # seconds in a day
     onehour = dconst_g[7]   # one hour convected to day.
 
-    #Stellar parameters
-    Mstar = dconst_g[0]
-    Rstar = dconst_g[1]
-
-    # ibi = cuda.local.array((1024, 4000), dtype=np.int32)
-    # y   = cuda.local.array((1024, 4000), dtype=np.float64)
+    qfac = pifac * Rstar*Rsun / (G*Mstar*Msun)**(1.0/3.0)
 
     #4000 = nb * 2.  So if nb changes, we need to change this
-    ibi = cuda.local.array(4000, dtype=np.int32)
-    y   = cuda.local.array(4000, dtype=np.float64)
+    ibi = cuda.local.array(4096, dtype=np.int32)
+    y   = cuda.local.array(4096, dtype=np.float64)
 
     for nk in range(start, freqs_g.shape[0], stride):
-
-        # if nk >= freqs_g.size:
-        #     return
             
         freq = freqs_g[nk]
-    
-        # #4000 = nb * 2.  So if nb changes, we need to change this
-        # ibi = cuda.local.array(4000, dtype=np.int32)
-        # y   = cuda.local.array(4000, dtype=np.float64)
 
-        for i in range(2000):
+        ohf = onehour*freq
+
+        for i in range(nb):
             ibi[i] = 0
             y[i]   = 0.0
         
         for i in range(npt):
-    
             phase = time_g[i]*freq - int(time_g[i]*freq)
             j = int(phase * nb1)
     
@@ -701,15 +690,16 @@ def bls_kernel(time_g, flux_g, const_g, dconst_g, freqs_g, power_g, jn1_g, jn2_g
     
         #duplicate array
         for i in range(nb):
-            ibi[i+nb] = ibi[i]
-            y[i+nb]   = y[i]
+            ibi[i + nb] = ibi[i]
+            y[i + nb]   = y[i]
+
     
         fsec = freq / day2sec
-        q = pifac * Rstar*Rsun / (G*Mstar*Msun)**(1.0/3.0) * fsec**(2.0/3.0)
+        q = qfac * fsec**(2.0/3.0)
     
         qmi = q / 2.0
-        if qmi < onehour*freq:
-            qmi = onehour*freq
+        if qmi < ohf:
+            qmi = ohf
     
         qma = q * 2.0
         if qma > 0.25:
@@ -745,7 +735,7 @@ def bls_kernel(time_g, flux_g, const_g, dconst_g, freqs_g, power_g, jn1_g, jn2_g
                 if k > kmi and kk > kkmi:
                     dfac = (kk * (npt - kk)) #const[1] = npt
                     if dfac > 0 :
-                        pow1 = s*s / dfac
+                        pow1 = s * s / dfac
                         old_max = cuda.atomic.max(power_g, nk, pow1)
                         if pow1 > old_max:
                             cuda.atomic.exch(jn1_g, nk, i)
