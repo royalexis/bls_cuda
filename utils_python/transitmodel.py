@@ -112,10 +112,8 @@ def transitModel(sol, time, itime, nintg=41):
                 if y2 >= 0:
                     # Check for transit
                     is_transit = 0
-                    for j in range(nintg):
-                        if bt[j] <= 1 + Rp_Rs:
-                            is_transit = 1
-                            # Could probably optimize this
+                    if any(x <= 1 + Rp_Rs for x in bt):
+                        is_transit = 1
 
                     if is_transit:
                         # Quadratic coefficients
@@ -134,14 +132,12 @@ def transitModel(sol, time, itime, nintg=41):
                     else:
                         tflux = np.ones(nintg)
 
-                    # Temp value
-                    tm = 0
-                    for j in range(nintg):
-                        # Could also probably optimize this since Rp/Rs is constant
-                        if Rp_Rs <= 0:
-                            tflux[j] = 1
-                        # Add all the contributions (for now there is only one)
-                        tm += tflux[j]
+                    if Rp_Rs <= 0:
+                        tflux = np.ones(nintg)
+
+                    # Add all the contributions
+                    tm = tflux.sum()
+
                     tm = tm/nintg
                 
                 # Eclipse
