@@ -9,6 +9,7 @@ def transitModel(sol, time, itime, nintg=41):
 
     # Constants
     G = 6.674e-11
+    Cs = 2.99792458e8
 
     # Reading parameters
     density = sol[0]
@@ -49,7 +50,7 @@ def transitModel(sol, time, itime, nintg=41):
             if ecw == 0:
                 w = np.pi/2
             else:
-                w = np.arctan2(esw/ecw)
+                w = np.arctan(esw/ecw)
             
             if ecw > 0 and esw < 0:
                 w += 2*np.pi
@@ -79,6 +80,9 @@ def transitModel(sol, time, itime, nintg=41):
             ttcor = 0 # For now
 
             tflux = np.zeros(nintg)
+            vt = np.zeros(nintg)
+            tide = np.zeros(nintg)
+            alb = np.zeros(nintg)
             bt = np.zeros(nintg)
 
             for j in range(nintg):
@@ -97,8 +101,6 @@ def transitModel(sol, time, itime, nintg=41):
                 
                 Eanom = kep.solve_kepler_eq(eccn, Manom, Eanom)
                 Tanom = kep.trueAnomaly(eccn, Eanom)
-                if (phi > np.pi):
-                    phi -= 2*np.pi  # Phi is never used anywhere after this
                 d_Rs = kep.distance(a_Rs, eccn, Tanom)
 
                 x2 = d_Rs * np.sin(Tanom-w)
@@ -106,15 +108,23 @@ def transitModel(sol, time, itime, nintg=41):
 
                 bt[j] = np.sqrt(x2*x2 + y2*y2)
 
-                ### Calculation of RV, ellip and albedo here (to do)
+                # Calculation of RV, ellip and albedo here
+
+                vt[j] = K * (np.cos(Tanom - w + np.pi/2) + eccn*np.cos(-w + np.pi/2))
+
+                tide[j] = ell * (d_Rs/a_Rs)**(1/3) * np.cos(2*(Tanom-w + np.pi/2))
+
+                # alb[j] = albedomod(ag, Tanom-w) * a_Rs/d_Rs (to do)
             
             if dtype[i] == 0:
                 if y2 >= 0:
                     # Check for transit
                     is_transit = 0
-                    if any(x <= 1 + Rp_Rs for x in bt):
-                        is_transit = 1
-
+                    for b in bt:
+                        if b <= 1 + Rp_Rs:
+                            is_transit = 1
+                            break
+                    
                     if is_transit:
                         # Quadratic coefficients
                         if (c3 == 0 and c4 == 0):
@@ -122,7 +132,9 @@ def transitModel(sol, time, itime, nintg=41):
                         
                         # Kipping coefficients
                         elif (c1 == 0 and c2 == 0):
-                            pass # To do
+                            c1 = 2 * np.sqrt(c3) * c4 # Convert to regular LD
+                            c2 = np.sqrt(c3) * (1 - 2*c4)
+                            tflux = occ.occultQuad(bt, c1, c2, Rp_Rs)
                         
                         # Non linear
                         else:
@@ -136,7 +148,7 @@ def transitModel(sol, time, itime, nintg=41):
                         tflux = np.ones(nintg)
 
                     # Add all the contributions
-                    tm = tflux.sum()
+                    tm = tflux.sum() - vt.sum()/Cs + tide.sum() + alb.sum()
 
                     tm = tm/nintg
                 
