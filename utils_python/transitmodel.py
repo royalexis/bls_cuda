@@ -118,7 +118,7 @@ def transitModel(sol, time, itime, nintg=41):
                     if is_transit:
                         # Quadratic coefficients
                         if (c3 == 0 and c4 == 0):
-                            tflux = occ.occultUniform(bt, Rp_Rs)
+                            tflux = occ.occultQuad(bt, c1, c2, Rp_Rs)
                         
                         # Kipping coefficients
                         elif (c1 == 0 and c2 == 0):

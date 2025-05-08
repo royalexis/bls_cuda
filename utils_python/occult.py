@@ -1,16 +1,15 @@
 import numpy as np
-from elliptic_int import ellE, ellK
+from utils_python.elliptic_int import ellE, ellK
 import mpmath as mpm
 
 def occultUniform(z0, p):
     n = len(z0)
     lambdae = np.zeros(n)
 
-    kap1 = np.arccos(min((1 - p*p + z0*z0) / (2*z0), 1))
-    kap0 = np.arccos(min((p*p + z0*z0 - 1) / (2*p*z0), 1))
-
     for i in range(n):
         z = z0[i]
+        kap1 = np.arccos(max(-1, min((1 - p*p + z*z) / (2*z), 1)))
+        kap0 = np.arccos(max(-1, min((p*p + z*z - 1) / (2*p*z), 1)))
 
         # Unobscured
         if z > 1 + p:
@@ -22,7 +21,7 @@ def occultUniform(z0, p):
 
         # Partially obscured and crossing star
         if (abs(1 - p) < z <= (1 + p)):
-            lambdae[i] = (p*p*kap0[i] + kap1[i] - 0.5 * np.sqrt(max(4*z*z - (1 + z*z - p*p)**2), 0)) / np.pi
+            lambdae[i] = (p*p*kap0 + kap1 - 0.5 * np.sqrt(max(4*z*z - (1 + z*z - p*p)**2, 0))) / np.pi
 
         # Partially obscured
         if (z <= 1 - p):
@@ -47,8 +46,8 @@ def occultQuad(z0, u1, u2, p):
         a = (z - p) ** 2
         b = (z + p) ** 2
         q = p*p - z*z
-        kap1 = np.arccos(min((1 - p*p + z*z) / (2*z), 1))
-        kap0 = np.arccos(min((p*p + z*z - 1) / (2*p*z), 1))
+        kap1 = np.arccos(max(-1, min((1 - p*p + z*z) / (2*z), 1)))
+        kap0 = np.arccos(max(-1, min((p*p + z*z - 1) / (2*p*z), 1)))
 
         # Unocculted
         if z >= 1 + p:
@@ -56,7 +55,7 @@ def occultQuad(z0, u1, u2, p):
             etad[i] = 0
 
         # Completely occulted
-        elif (p <= 1) and (z <= p-1):
+        elif (p >= 1) and (z <= p-1):
             lambdad[i] = 1
             etad[i] = 1
 
@@ -86,12 +85,12 @@ def occultQuad(z0, u1, u2, p):
                 lambdad[i] += 2/3
 
         # Transits the source
-        elif p < 1 and z <= (1 - p) * 1.0001:
-            k = np.sqrt((b-a)/(1-a))
+        elif p <= 1 and z <= (1 - p) * 1.0001:
+            k = np.sqrt((b-a)/(1-a)) # k^(-1)
             if k > 1:
                 k = 0.99999
             
-            lambdad[i] = lambda2(p, z, k, a, b, q)
+            lambdad[i] = lambda2(p, z, 1/k, a, b, q)
             if z < p:
                 lambdad[i] += 2/3
             if abs(p + z - 1) <= 1e-4:
@@ -106,7 +105,7 @@ def occultQuad(z0, u1, u2, p):
 def lambda1(p, z, k, a, b, q):
     Kk = ellK(k)
     Ek = ellE(k)
-    Pk = mpm.ellippi((a-1)/a, k)
+    Pk = mpm.ellippi((a-1)/a, k*k) # ellippi takes m=k^2 as the second argument
 
     temp1 = ((1-b) * (2*b + a - 3) - 3*q*(b - 2)) * Kk
     temp2 = 4*p*z * (z*z + 7*p*p - 4)*Ek
@@ -116,7 +115,7 @@ def lambda1(p, z, k, a, b, q):
 def lambda2(p, z, k, a, b, q):
     Kk = ellK(1/k)
     Ek = ellE(1/k)
-    Pk = mpm.ellippi((a-b)/a, 1/k)
+    Pk = mpm.ellippi((a-b)/a, 1/(k*k)) # ellippi takes m=k^2 as the second argument
 
     temp1 = (1 - 5*z*z + p*p + q*q) * Kk
     temp2 = (1 - a) * (z*z + 7*p*p - 4) * Ek
