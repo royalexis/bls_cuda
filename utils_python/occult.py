@@ -1,6 +1,5 @@
 import numpy as np
-from utils_python.elliptic_int import ellE, ellK
-import mpmath as mpm
+from utils_python.elliptic_int import ellE, ellK, ellPi
 
 def occultUniform(z0, p):
     n = len(z0)
@@ -62,7 +61,7 @@ def occultQuad(z0, u1, u2, p):
         # Edge of the occulting star lies at the origin (z = p)
         elif (abs(z-p) < 1e-4 * (z+p)):
             if z >= 0.5:
-                lambdad[i] = lambda3(p, p) # Why do we use p as the second argument here? If p=z, then k=1/(2p), not p
+                lambdad[i] = lambda3(p, 1/(2*p))
                 etad[i] = eta1(kap0, kap1, p, z, a, b)
 
                 if p == 0.5:
@@ -70,7 +69,7 @@ def occultQuad(z0, u1, u2, p):
                     etad[i] = 3/32
 
             else:
-                lambdad[i] = lambda4(p, p) # Same question for p here
+                lambdad[i] = lambda4(p, 1/(2*p))
                 etad[i] = eta2(p, z)
 
         # Partly occults the source
@@ -105,7 +104,7 @@ def occultQuad(z0, u1, u2, p):
 def lambda1(p, z, k, a, b, q):
     Kk = ellK(k)
     Ek = ellE(k)
-    Pk = mpm.ellippi((a-1)/a, k*k) # ellippi takes m=k^2 as the second argument
+    Pk = ellPi((a-1)/a, k)
 
     temp1 = ((1-b) * (2*b + a - 3) - 3*q*(b - 2)) * Kk
     temp2 = 4*p*z * (z*z + 7*p*p - 4)*Ek
@@ -115,7 +114,7 @@ def lambda1(p, z, k, a, b, q):
 def lambda2(p, z, k, a, b, q):
     Kk = ellK(1/k)
     Ek = ellE(1/k)
-    Pk = mpm.ellippi((a-b)/a, 1/(k*k)) # ellippi takes m=k^2 as the second argument
+    Pk = ellPi((a-b)/a, 1/k)
 
     temp1 = (1 - 5*z*z + p*p + q*q) * Kk
     temp2 = (1 - a) * (z*z + 7*p*p - 4) * Ek

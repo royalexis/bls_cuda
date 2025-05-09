@@ -21,6 +21,10 @@ def transitModel(sol, time, itime, nintg=41):
     voff = sol[6]
     zpt = sol[7]
 
+    # Kipping Coefficients
+    a = 2 * np.sqrt(c3) * c4
+    b = np.sqrt(c3) * (1 - 2*c4)
+
     nb_pts = len(time)
     tmodel = np.zeros(nb_pts)
     dtype = np.zeros(nb_pts) # Photometry only
@@ -132,9 +136,7 @@ def transitModel(sol, time, itime, nintg=41):
                         
                         # Kipping coefficients
                         elif (c1 == 0 and c2 == 0):
-                            c1 = 2 * np.sqrt(c3) * c4 # Convert to regular LD
-                            c2 = np.sqrt(c3) * (1 - 2*c4)
-                            tflux = occ.occultQuad(bt, c1, c2, Rp_Rs)
+                            tflux = occ.occultQuad(bt, a, b, Rp_Rs)
                         
                         # Non linear
                         else:
