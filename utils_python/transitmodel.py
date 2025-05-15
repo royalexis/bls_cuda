@@ -159,13 +159,34 @@ def transitModel(sol, time, itime, nintg=41):
                 
                 # Eclipse
                 else:
-                    tm = 1
-                    pass # To do
+                    bp = bt/Rp_Rs
+                    # Treat the star as the object blocking the light
+                    occult = occ.occultUniform(bp, 1/Rp_Rs)
+                    
+                    if Rp_Rs < 0:
+                        ratio = np.zeros(nintg)
+                    else:
+                        ratio = 1 - occult
+
+                    tm = (nintg - ted*ratio.sum()) - vt.sum()/Cs + tide.sum() + alb.sum()
+
+                    tm = tm/nintg
+
+                tm += (1 - tm)*dil # Add dilution
+            
+            # Radial velocity
             else:
                 tm = 1
                 pass # To do
 
             tmodel[i] += tm
+    
+    # Add zero point
+    for i in range(nb_pts):
+        if dtype[i] == 0:
+            tmodel[i] += zpt
+        else:
+            tmodel[i] += voff - 1
 
     return tmodel
 
