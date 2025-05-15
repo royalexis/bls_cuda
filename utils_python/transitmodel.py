@@ -1,6 +1,7 @@
 import numpy as np
 import utils_python.keplerian as kep
 import utils_python.occult as occ
+from utils_python.effects import albedoMod
 
 def transitModel(sol, time, itime, nintg=41):
     """
@@ -118,7 +119,7 @@ def transitModel(sol, time, itime, nintg=41):
 
                 tide[j] = ell * (d_Rs/a_Rs)**(1/3) * np.cos(2*(Tanom-w + np.pi/2))
 
-                # alb[j] = albedomod(ag, Tanom-w) * a_Rs/d_Rs (to do)
+                alb[j] = albedoMod(Tanom - w, ag) * a_Rs/d_Rs
             
             if dtype[i] == 0:
                 if y2 >= 0:
