@@ -9,8 +9,6 @@ def occultUniform(z0, p):
 
     for i in range(n):
         z = z0[i]
-        kap1 = np.arccos(max(-1, min((1 - p*p + z*z) / (2*z), 1)))
-        kap0 = np.arccos(max(-1, min((p*p + z*z - 1) / (2*p*z), 1)))
 
         # Unobscured
         if z > 1 + p:
@@ -22,6 +20,8 @@ def occultUniform(z0, p):
 
         # Partially obscured and crossing star
         if (abs(1 - p) < z <= (1 + p)):
+            kap1 = np.arccos(max(-1, min((1 - p*p + z*z) / (2*z), 1)))
+            kap0 = np.arccos(max(-1, min((p*p + z*z - 1) / (2*p*z), 1)))
             lambdae[i] = (p*p*kap0 + kap1 - 0.5 * np.sqrt(max(4*z*z - (1 + z*z - p*p)**2, 0))) / np.pi
 
         # Partially obscured
@@ -34,14 +34,12 @@ def occultUniform(z0, p):
 def occultQuad(z0, u1, u2, p):
     n = len(z0)
 
-    # Calculate lambdae first (Two loops are run instead of one, so it might be a bit slower)
-    lambdae = 1 - occultUniform(z0, p)
-
     # Omega is actually 4*Omega in the paper
     Omega = 1 - u1/3 - u2/6
 
     lambdad = np.zeros(n)
     etad = np.zeros(n)
+    lambdae = np.zeros(n)
 
     for i in range(n):
         z = z0[i]
@@ -51,8 +49,11 @@ def occultQuad(z0, u1, u2, p):
         kap1 = np.arccos(max(-1, min((1 - p*p + z*z) / (2*z), 1)))
         kap0 = np.arccos(max(-1, min((p*p + z*z - 1) / (2*p*z), 1)))
 
+        ### lambdae Calculation
+
         # Unocculted
         if z >= 1 + p:
+            lambdae[i] = 0
             lambdad[i] = 0
             etad[i] = 0
 
@@ -60,9 +61,20 @@ def occultQuad(z0, u1, u2, p):
         elif (p >= 1) and (z <= p-1):
             lambdad[i] = 1
             etad[i] = 1
+            lambdae[i] = 1
+
+        # Partially obscured and crossing star
+        elif (abs(1 - p) < z <= (1 + p)):
+            lambdae[i] = (p*p*kap0 + kap1 - 0.5 * np.sqrt(max(4*z*z - (1 + z*z - p*p)**2, 0))) / np.pi
+
+        # Partially obscured
+        elif (z <= 1 - p):
+            lambdae[i] = p*p
+
+        ### lambdad and etad Calculation
 
         # Edge of the occulting star lies at the origin (z = p)
-        elif (abs(z-p) < 1e-4 * (z+p)):
+        if (abs(z-p) < 1e-4 * (z+p)):
             if z >= 0.5:
                 lambdad[i] = lambda3(p, 1/(2*p))
                 etad[i] = eta1(kap0, kap1, p, z, a, b)

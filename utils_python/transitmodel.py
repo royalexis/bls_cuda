@@ -66,7 +66,7 @@ def transitModel(sol, time, itime, nintg=41):
 
         # Calculate a/R*
         #a_Rs = (4*np.pi/3 * density * Per * Per) ** (1/3) # There is something wrong with this formula (probably a unit problem)
-        a_Rs = 10 * (density * G * (Per*86400)**2/(3*np.pi)) ** (1/3)
+        a_Rs = 10 * (density * G * (Per*86400)**2 / (3*np.pi)) ** (1/3)
 
         K = sol[10*ii + 8 + 6] # RV amplitude
         ted = sol[10*ii + 8 + 7]/1e6 # Occultation Depth
@@ -74,7 +74,7 @@ def transitModel(sol, time, itime, nintg=41):
         ag = sol[10*ii + 8 + 9]/1e6 # Albedo amplitude
 
         # Calculate phi0
-        Eanom = 2 * np.arctan(np.tan(w/2) / np.sqrt((1 + eccn)/(1 - eccn)))
+        Eanom = 2 * np.arctan(np.tan(w/2) * np.sqrt((1 - eccn)/(1 + eccn)))
         phi0 = Eanom - eccn*np.sin(Eanom)
 
         # Calculate inclinaison
