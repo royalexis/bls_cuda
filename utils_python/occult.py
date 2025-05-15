@@ -1,6 +1,8 @@
 import numpy as np
 from utils_python.elliptic_int import ellE, ellK, ellPi
+from numba import njit
 
+@njit
 def occultUniform(z0, p):
     n = len(z0)
     lambdae = np.zeros(n)
@@ -28,6 +30,7 @@ def occultUniform(z0, p):
 
     return 1 - lambdae
 
+@njit
 def occultQuad(z0, u1, u2, p):
     n = len(z0)
 
@@ -100,7 +103,7 @@ def occultQuad(z0, u1, u2, p):
     c2 = u1 + 2*u2
     return 1 - ((1 - c2) * lambdae + c2*lambdad + u2*etad)/Omega
         
-
+@njit
 def lambda1(p, z, k, a, b, q):
     Kk = ellK(k)
     Ek = ellE(k)
@@ -111,6 +114,7 @@ def lambda1(p, z, k, a, b, q):
 
     return 1/(9*np.pi*np.sqrt(p*z)) * (temp1 + temp2 - 3*q/a * Pk)
 
+@njit
 def lambda2(p, z, k, a, b, q):
     Kk = ellK(1/k)
     Ek = ellE(1/k)
@@ -121,6 +125,7 @@ def lambda2(p, z, k, a, b, q):
 
     return 2/(9*np.pi*np.sqrt(1 - a)) * (temp1 + temp2 - 3*q/a * Pk)
 
+@njit
 def lambda3(p, k):
     Kk = ellK(1/(2*k))
     Ek = ellE(1/(2*k))
@@ -130,6 +135,7 @@ def lambda3(p, k):
 
     return 1/3 + temp1 - temp2
 
+@njit
 def lambda4(p, k):
     Kk = ellK(2*k)
     Ek = ellE(2*k)
@@ -139,11 +145,14 @@ def lambda4(p, k):
 
     return 1/3 + 2/(9*np.pi) * (temp1 + temp2)
 
+@njit
 def lambda5(p):
     return 2/(3*np.pi) * np.arccos(1 - 2*p) - 4/(9*np.pi) * (3 + 2*p - 8*p*p) * np.sqrt(p*(1 - p)) # Why multiply by np.sqrt(p*(1 - p)) ?
 
+@njit
 def eta1(k0, k1, p, z, a ,b):
     return 1/(2*np.pi) * (k1 + 2*eta2(p, z)*k0 - 0.25*(1 + 5*p*p + z*z) * np.sqrt((1-a) * (b-1)))
 
+@njit
 def eta2(p, z):
     return p*p/2 * (p*p + 2*z*z)

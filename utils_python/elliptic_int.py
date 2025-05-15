@@ -1,5 +1,7 @@
 import numpy as np
+from numba import njit
 
+@njit
 def ellK(k):
     """
     Computes the elliptic integral of the first kind (Hasting's approximation)
@@ -21,6 +23,7 @@ def ellK(k):
 
     return ek1 - ek2
 
+@njit
 def ellE(k):
     """
     Computes the elliptic integral of the second kind (Hasting's approximation)
@@ -41,12 +44,14 @@ def ellE(k):
     
     return ee1 - ee2
 
+@njit
 def ellPi(n, k):
     """
     Computes the elliptic integral of the third kind
     """
     return ellK(k) + n/3 * Rj(0, 1-k*k, 1, 1 - n)
 
+@njit
 def Rc(x, y, tol=0.04):
     """
     R_C function for calculating elliptic integrals
@@ -75,6 +80,7 @@ def Rc(x, y, tol=0.04):
 
     return w * (ave)**(-1/2) * (1 + s*s*(0.3 + s*(1/7 + s*(3/8 + s*9/22))))
 
+@njit
 def Rf(x, y, z, tol=0.08):
     """
     R_F function for calculating elliptic integrals
@@ -99,6 +105,7 @@ def Rf(x, y, z, tol=0.08):
     e3 = delx*dely*delz
     return (1 + (1/24*e2 - 0.1 - 3/44*e3)*e2 + 1/14*e3) / np.sqrt(ave)
 
+@njit
 def Rj(x, y, z, p, tol=0.05):
     """
     R_J function for calculating elliptic integrals

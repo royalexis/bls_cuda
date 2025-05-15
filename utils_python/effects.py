@@ -1,7 +1,9 @@
 import numpy as np
+from numba import njit
 
+@njit
 def albedoMod(phi, ag):
-    phi=phi + np.pi
+    phi = phi + np.pi
     if phi > 2*np.pi:
         phi = phi - 2*np.pi
 
@@ -12,4 +14,4 @@ def albedoMod(phi, ag):
 
     phase = (np.sin(alpha) + (np.pi - alpha)*np.cos(alpha)) / np.pi
       
-    return ag*phase
+    return ag * phase

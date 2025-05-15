@@ -2,7 +2,9 @@ import numpy as np
 import utils_python.keplerian as kep
 import utils_python.occult as occ
 from utils_python.effects import albedoMod
+from numba import njit
 
+@njit
 def transitModel(sol, time, itime, nintg=41):
     """
     Transit Model
@@ -23,8 +25,8 @@ def transitModel(sol, time, itime, nintg=41):
     zpt = sol[7]
 
     # Kipping Coefficients
-    a = 2 * np.sqrt(c3) * c4
-    b = np.sqrt(c3) * (1 - 2*c4)
+    a1 = 2 * np.sqrt(c3) * c4
+    a2 = np.sqrt(c3) * (1 - 2*c4)
 
     nb_pts = len(time)
     tmodel = np.zeros(nb_pts)
@@ -137,7 +139,7 @@ def transitModel(sol, time, itime, nintg=41):
                         
                         # Kipping coefficients
                         elif (c1 == 0 and c2 == 0):
-                            tflux = occ.occultQuad(bt, a, b, Rp_Rs)
+                            tflux = occ.occultQuad(bt, a1, a2, Rp_Rs)
                         
                         # Non linear
                         else:
