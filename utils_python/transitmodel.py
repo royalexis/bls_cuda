@@ -54,15 +54,10 @@ def transitModel(sol, time, itime, nintg=41):
         elif eccn == 0:
             w = 0
         else:
-            if ecw == 0:
-                w = np.pi/2
-            else:
-                w = np.arctan(esw/ecw)
-            
-            if ecw > 0 and esw < 0:
+            # arctan2 gives a result in [-pi, pi], so we add 2pi to the negative values
+            w = np.arctan2(esw, ecw)
+            if w < 0:
                 w += 2*np.pi
-            elif (ecw < 0 and esw >= 0) or (ecw <= 0 and esw < 0):
-                w += np.pi
 
         # Calculate a/R*
         #a_Rs = (4*np.pi/3 * density * Per * Per) ** (1/3) # There is something wrong with this formula (probably a unit problem)
@@ -143,7 +138,7 @@ def transitModel(sol, time, itime, nintg=41):
                         
                         # Non linear
                         else:
-                            pass # To do
+                            tflux = occ.occultSmall(bt, c1, c2, c3, c4, Rp_Rs)
 
                     # If no transit, tflux = 1
                     else:

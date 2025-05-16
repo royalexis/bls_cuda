@@ -168,3 +168,33 @@ def eta1(k0, k1, p, z, a ,b):
 @njit
 def eta2(p, z):
     return p*p/2 * (p*p + 2*z*z)
+
+@njit
+def occultSmall(z0, c1, c2, c3, c4, p):
+    n = len(z0)
+    flux = np.zeros(n)
+    norm = 1 - c1/5 - c2/3 - 3*c3/7 - c4/2
+
+    for i in range(n):
+        z = z0[i]
+        x = 1 - (z - p)**2
+
+        if 1 - p < z < 1 + p:
+            integral = 1 - c1*(1 - 0.8*x**0.25) - c2*(1 - 2/3*x**0.5) - c3*(1 - 4/7*x**0.75) - c4*(1 - x/2)
+            # We need to divide by pi here, otherwise we get weird results. Not sure why it fixes it
+            flux[i] = 1 - integral * (p*p * np.arccos((z - 1)/p) - (z - 1)*np.sqrt(p*p - (z-1)**2)) / (norm * np.pi)
+
+        elif z <= 1 - p and z != 0:
+            sig1 = (1 - (z - p)**2)**(1/4)
+            sig2 = (1 - (z + p)**2)**(1/4)
+            integral = 1 - c1*(1 + (sig2**5 - sig1**5)/(5*p*z)) - c2*(1 + (sig2**6 - sig1**6)/(6*p*z)) \
+                            - c3*(1 + (sig2**7 - sig1**7)/(7*p*z)) - c4*(p*p + z*z)
+            flux[i] = 1 - integral*p*p/norm
+        
+        elif z == 0:
+            flux[i] = 1 - p*p/norm
+        
+        else:
+            flux[i] = 1
+
+    return flux
