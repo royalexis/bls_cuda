@@ -19,7 +19,7 @@ def distance(a, eccn, Tanom):
     return a * (1 - eccn*eccn) / (1 + eccn * np.cos(Tanom))
 
 @njit
-def solve_kepler_eq(eccn, Manom, Eanom, thres=1e-8, itmax=100):
+def solve_kepler_eq(eccn, Manom, Eanom, thres=1e-6, itmax=100):
 
     # First calculation to find diff
     Eold = max(Eanom, 0.0001)

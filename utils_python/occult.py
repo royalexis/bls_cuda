@@ -3,9 +3,8 @@ from utils_python.elliptic_int import ellE, ellK, ellPi
 from numba import njit
 
 @njit
-def occultUniform(z0, p):
+def occultUniform(z0, p, lambdae):
     n = len(z0)
-    lambdae = np.zeros(n)
 
     for i in range(n):
         z = z0[i]
@@ -31,15 +30,11 @@ def occultUniform(z0, p):
     return 1 - lambdae
 
 @njit
-def occultQuad(z0, u1, u2, p):
+def occultQuad(z0, u1, u2, p, lambdad, etad, lambdae):
     n = len(z0)
 
     # Omega is actually 4*Omega in the paper
     Omega = 1 - u1/3 - u2/6
-
-    lambdad = np.zeros(n)
-    etad = np.zeros(n)
-    lambdae = np.zeros(n)
 
     for i in range(n):
         z = z0[i]
