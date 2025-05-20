@@ -4,15 +4,15 @@ import utils_python.occult as occ
 from utils_python.effects import albedoMod
 from numba import njit
 
+# Constants
+G = 6.674e-11
+Cs = 2.99792458e8
+
 @njit
 def transitModel(sol, time, itime, nintg=41):
     """
     Transit Model
     """
-
-    # Constants
-    G = 6.674e-11
-    Cs = 2.99792458e8
 
     # Reading parameters
     density = sol[0]
@@ -31,6 +31,12 @@ def transitModel(sol, time, itime, nintg=41):
     nb_pts = len(time)
     tmodel = np.zeros(nb_pts)
     dtype = np.zeros(nb_pts) # Photometry only
+
+    tflux = np.zeros(nintg)
+    vt = np.zeros(nintg)
+    tide = np.zeros(nintg)
+    alb = np.zeros(nintg)
+    bt = np.zeros(nintg)
 
     # Temporary
     n_planet = 1
@@ -80,12 +86,6 @@ def transitModel(sol, time, itime, nintg=41):
         # Loop over all of the points
         for i in range(nb_pts):
             ttcor = 0 # For now
-
-            tflux = np.zeros(nintg)
-            vt = np.zeros(nintg)
-            tide = np.zeros(nintg)
-            alb = np.zeros(nintg)
-            bt = np.zeros(nintg)
 
             for j in range(nintg):
                 
@@ -174,7 +174,7 @@ def transitModel(sol, time, itime, nintg=41):
                 tm = 1
                 pass # To do
 
-            tmodel[i] += tm
+            tmodel[i] += tm # /n_planet ? To check
     
     # Add zero point
     for i in range(nb_pts):
