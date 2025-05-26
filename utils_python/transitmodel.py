@@ -90,11 +90,13 @@ def transitModel(sol, time, itime, nintg=41):
         # Loop over all of the points
         for i in range(nb_pts):
             ttcor = 0 # For now
+            time_i = time[i]
+            itime_i = itime[i]
 
             for j in range(nintg):
                 
                 # Time-Convolution
-                t = time[i] - itime[i] * (0.5 - 1/(2*nintg) - j/nintg) - epoch - ttcor
+                t = time_i - itime_i * (0.5 - 1/(2*nintg) - j/nintg) - epoch - ttcor
 
                 phi = t/Per - np.floor(t/Per)
                 Manom = phi * 2*np.pi + phi0
@@ -108,6 +110,9 @@ def transitModel(sol, time, itime, nintg=41):
                 Eanom = kep.solve_kepler_eq(eccn, Manom, Eanom)
                 Tanom = kep.trueAnomaly(eccn, Eanom)
                 d_Rs = kep.distance(a_Rs, eccn, Tanom)
+                # Eanom = Manom
+                # Tanom = Manom
+                # d_Rs = a_Rs
 
                 x2 = d_Rs * np.sin(Tanom-w)
                 y2 = d_Rs * np.cos(Tanom-w)*np.cos(incl)
@@ -146,13 +151,15 @@ def transitModel(sol, time, itime, nintg=41):
 
                     # If no transit, tflux = 1
                     else:
-                        tflux = np.ones(nintg)
+                        tflux[:] = 1
 
                     if Rp_Rs <= 0:
-                        tflux = np.ones(nintg)
+                        tflux[:] = 1
 
                     # Add all the contributions
-                    tm = tflux.sum() - vt.sum()/Cs + tide.sum() + alb.sum()
+                    tm = 0
+                    for j in range(nintg):
+                        tm += tflux[j] - vt[j]/Cs + tide[j] + alb[j]
 
                     tm = tm/nintg
                 
@@ -167,7 +174,9 @@ def transitModel(sol, time, itime, nintg=41):
                     else:
                         ratio = 1 - occult
 
-                    tm = (nintg - ted*ratio.sum()) - vt.sum()/Cs + tide.sum() + alb.sum()
+                    tm = 0
+                    for j in range(nintg):
+                        tm += 1 - ted*ratio[j] - vt[j]/Cs + tide[j] + alb[j]
 
                     tm = tm/nintg
 
