@@ -110,9 +110,6 @@ def transitModel(sol, time, itime, nintg=41):
                 Eanom = kep.solve_kepler_eq(eccn, Manom, Eanom)
                 Tanom = kep.trueAnomaly(eccn, Eanom)
                 d_Rs = kep.distance(a_Rs, eccn, Tanom)
-                # Eanom = Manom
-                # Tanom = Manom
-                # d_Rs = a_Rs
 
                 x2 = d_Rs * np.sin(Tanom-w)
                 y2 = d_Rs * np.cos(Tanom-w)*np.cos(incl)
