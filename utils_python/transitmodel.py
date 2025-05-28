@@ -1,3 +1,5 @@
+import os
+import concurrent.futures as cf
 import numpy as np
 import utils_python.keplerian as kep
 import utils_python.occult as occ
@@ -8,7 +10,6 @@ from numba import njit
 G = 6.674e-11
 Cs = 2.99792458e8
 
-@njit
 def transitModel(sol, time, itime, nintg=41):
     """
     Transit Model
@@ -29,7 +30,6 @@ def transitModel(sol, time, itime, nintg=41):
     a2 = np.sqrt(c3) * (1 - 2*c4)
 
     nb_pts = len(time)
-    tmodel = np.zeros(nb_pts)
     dtype = np.zeros(nb_pts) # Photometry only
 
     tflux = np.zeros(nintg)
@@ -41,6 +41,16 @@ def transitModel(sol, time, itime, nintg=41):
     lambdad = np.zeros(nintg)
     etad = np.zeros(nintg)
     lambdae = np.zeros(nintg)
+
+    # Calculation for multithreading
+    max_processes = os.cpu_count()
+    ndiv = nb_pts // (max_processes - 1) + 1
+    tmodel = np.zeros((max_processes, ndiv))
+
+    iarg = np.zeros((max_processes, ndiv), dtype=np.int32)
+    for i in range(0, max_processes):
+        for k, j in enumerate(range(i, nb_pts, max_processes)):
+            iarg[i, k] = j
 
     # Temporary
     n_planet = 1
@@ -103,12 +113,21 @@ def transitModel(sol, time, itime, nintg=41):
         To do eventually: Use most of the resources where there's lot of computation (where there is a transit)
         """
 
+        # Computes the transit using multiprocessing
+        with cf.ProcessPoolExecutor(max_workers=max_processes) as executor:
+            futures = {executor.submit(compute_transit, iarg[i], tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
+                                        c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
+                                        w, K, ell, ag, Rp_Rs, ted, dil, ndiv) : i for i in range(max_processes)}
+            
+            for future in cf.as_completed(futures):
+                i = futures[future]
+                try:
+                    result = future.result()
+                    tmodel[i,:] = result
+                except Exception as exc:
+                    print(f'Generated an exception: {exc}')
 
-        # Loop over all of the points
-        for i in range(nb_pts):
-            tmodel[i] += transitOnePoint(tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
-                    c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                    w, K, ell, ag, Rp_Rs, ted, dil, i)
+        tmodel = tmodel.T.ravel()[:nb_pts]
     
     # Add zero point
     for i in range(nb_pts):
@@ -119,14 +138,28 @@ def transitModel(sol, time, itime, nintg=41):
 
     return tmodel
 
+def compute_transit(iarg, tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
+                    c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
+                    w, K, ell, ag, Rp_Rs, ted, dil, ndiv):
+    """This function computes all the the transit points that a certain process calculates"""
+    
+    tm = np.zeros(ndiv)
+
+    for j, i in enumerate(iarg):
+        tm[j] = transitOnePoint(tflux, time[i], itime[i], dtype[i], bt, vt, tide, alb, lambdae, lambdad, etad,
+                    c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
+                    w, K, ell, ag, Rp_Rs, ted, dil)
+        
+    return tm
+
 
 @njit
-def transitOnePoint(tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
+def transitOnePoint(tflux, time_i, itime_i, dtype_i, bt, vt, tide, alb, lambdae, lambdad, etad,
                     c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                    w, K, ell, ag, Rp_Rs, ted, dil, i):
+                    w, K, ell, ag, Rp_Rs, ted, dil):
+    """This function computes the transit model for a single point"""
+
     ttcor = 0 # For now
-    time_i = time[i]
-    itime_i = itime[i]
 
     for j in range(nintg):
                 
@@ -157,7 +190,7 @@ def transitOnePoint(tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambd
         tide[j] = ell * (d_Rs/a_Rs)**(1/3) * np.cos(2*(Tanom-w + np.pi/2))
         alb[j] = albedoMod(Tanom - w, ag) * a_Rs/d_Rs
             
-    if dtype[i] == 0:
+    if dtype_i == 0:
         if y2 >= 0:
             # Check for transit
             is_transit = 0
