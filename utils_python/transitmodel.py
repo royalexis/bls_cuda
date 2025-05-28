@@ -87,104 +87,28 @@ def transitModel(sol, time, itime, nintg=41):
         d_Rs = kep.distance(a_Rs, eccn, Tanom) # Distance over R*
         incl = np.arccos(b/d_Rs)
 
+
+        """
+        To Implement multiprocessing
+
+        - Copy the inside of the nb_pts loop to a seperate njit function (equivalent to bls_kernel())
+            -> The function returns the tmodel for one point
+        - Make a wrapper to that function that calculates all the points for a certain process (equivalent to compute_bls_kernel())
+        - Replace the loop over the points to a process pool executor, making sure to give the right arguments to the function.
+            -> There will be a lot of args: (time, itime, epoch, bt, vt, ...)
+            -> This might require creating a 2D array containing indices to get the time_i and itime_i (equivalent to the iarg array)
+        - I will have to remove the njit decorator of this main function.
+            -> This means probably putting the code above to a seperate njit function
+
+        To do eventually: Use most of the resources where there's lot of computation (where there is a transit)
+        """
+
+
         # Loop over all of the points
         for i in range(nb_pts):
-            ttcor = 0 # For now
-            time_i = time[i]
-            itime_i = itime[i]
-
-            for j in range(nintg):
-                
-                # Time-Convolution
-                t = time_i - itime_i * (0.5 - 1/(2*nintg) - j/nintg) - epoch - ttcor
-
-                phi = t/Per - np.floor(t/Per)
-                Manom = phi * 2*np.pi + phi0
-
-                # Make sure Manom is in [0, 2pi]
-                if (Manom > 2*np.pi):
-                    Manom -= 2*np.pi
-                if (Manom < 0):
-                    Manom += 2*np.pi
-                
-                Eanom = kep.solve_kepler_eq(eccn, Manom, Eanom)
-                Tanom = kep.trueAnomaly(eccn, Eanom)
-                d_Rs = kep.distance(a_Rs, eccn, Tanom)
-
-                x2 = d_Rs * np.sin(Tanom-w)
-                y2 = d_Rs * np.cos(Tanom-w)*np.cos(incl)
-
-                bt[j] = np.sqrt(x2*x2 + y2*y2)
-
-                # Calculation of RV, ellip and albedo here
-
-                vt[j] = K * (np.cos(Tanom - w + np.pi/2) + eccn*np.cos(-w + np.pi/2))
-
-                tide[j] = ell * (d_Rs/a_Rs)**(1/3) * np.cos(2*(Tanom-w + np.pi/2))
-
-                alb[j] = albedoMod(Tanom - w, ag) * a_Rs/d_Rs
-            
-            if dtype[i] == 0:
-                if y2 >= 0:
-                    # Check for transit
-                    is_transit = 0
-                    for b in bt:
-                        if b <= 1 + Rp_Rs:
-                            is_transit = 1
-                            break
-                    
-                    if is_transit:
-                        # Quadratic coefficients
-                        if (c3 == 0 and c4 == 0):
-                            tflux = occ.occultQuad(bt, c1, c2, Rp_Rs, lambdad, etad, lambdae)
-                        
-                        # Kipping coefficients
-                        elif (c1 == 0 and c2 == 0):
-                            tflux = occ.occultQuad(bt, a1, a2, Rp_Rs, lambdad, etad, lambdae)
-                        
-                        # Non linear
-                        else:
-                            tflux = occ.occultSmall(bt, c1, c2, c3, c4, Rp_Rs)
-
-                    # If no transit, tflux = 1
-                    else:
-                        tflux[:] = 1
-
-                    if Rp_Rs <= 0:
-                        tflux[:] = 1
-
-                    # Add all the contributions
-                    tm = 0
-                    for j in range(nintg):
-                        tm += tflux[j] - vt[j]/Cs + tide[j] + alb[j]
-
-                    tm = tm/nintg
-                
-                # Eclipse
-                else:
-                    bp = bt/Rp_Rs
-                    # Treat the star as the object blocking the light
-                    occult = occ.occultUniform(bp, 1/Rp_Rs, lambdae)
-                    
-                    if Rp_Rs < 0:
-                        ratio = np.zeros(nintg)
-                    else:
-                        ratio = 1 - occult
-
-                    tm = 0
-                    for j in range(nintg):
-                        tm += 1 - ted*ratio[j] - vt[j]/Cs + tide[j] + alb[j]
-
-                    tm = tm/nintg
-
-                tm += (1 - tm)*dil # Add dilution
-            
-            # Radial velocity
-            else:
-                tm = 1
-                pass # To do
-
-            tmodel[i] += tm # /n_planet ? To check
+            tmodel[i] += transitOnePoint(tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
+                    c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
+                    w, K, ell, ag, Rp_Rs, ted, dil, i)
     
     # Add zero point
     for i in range(nb_pts):
@@ -195,3 +119,102 @@ def transitModel(sol, time, itime, nintg=41):
 
     return tmodel
 
+
+@njit
+def transitOnePoint(tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
+                    c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
+                    w, K, ell, ag, Rp_Rs, ted, dil, i):
+    ttcor = 0 # For now
+    time_i = time[i]
+    itime_i = itime[i]
+
+    for j in range(nintg):
+                
+        # Time-Convolution
+        t = time_i - itime_i * (0.5 - 1/(2*nintg) - j/nintg) - epoch - ttcor
+
+        phi = t/Per - np.floor(t/Per)
+        Manom = phi * 2*np.pi + phi0
+
+        # Make sure Manom is in [0, 2pi]
+        if (Manom > 2*np.pi):
+            Manom -= 2*np.pi
+        if (Manom < 0):
+            Manom += 2*np.pi
+                
+        Eanom = kep.solve_kepler_eq(eccn, Manom, Eanom)
+        Tanom = kep.trueAnomaly(eccn, Eanom)
+        d_Rs = kep.distance(a_Rs, eccn, Tanom)
+
+        x2 = d_Rs * np.sin(Tanom-w)
+        y2 = d_Rs * np.cos(Tanom-w)*np.cos(incl)
+
+        bt[j] = np.sqrt(x2*x2 + y2*y2)
+
+        # Calculation of RV, ellip and albedo here
+
+        vt[j] = K * (np.cos(Tanom - w + np.pi/2) + eccn*np.cos(-w + np.pi/2))
+        tide[j] = ell * (d_Rs/a_Rs)**(1/3) * np.cos(2*(Tanom-w + np.pi/2))
+        alb[j] = albedoMod(Tanom - w, ag) * a_Rs/d_Rs
+            
+    if dtype[i] == 0:
+        if y2 >= 0:
+            # Check for transit
+            is_transit = 0
+            for b in bt:
+                if b <= 1 + Rp_Rs:
+                    is_transit = 1
+                    break
+                    
+            if is_transit:
+                # Quadratic coefficients
+                if (c3 == 0 and c4 == 0):
+                    tflux = occ.occultQuad(bt, c1, c2, Rp_Rs, lambdad, etad, lambdae)
+                        
+                # Kipping coefficients
+                elif (c1 == 0 and c2 == 0):
+                    tflux = occ.occultQuad(bt, a1, a2, Rp_Rs, lambdad, etad, lambdae)
+                        
+                # Non linear
+                else:
+                    tflux = occ.occultSmall(bt, c1, c2, c3, c4, Rp_Rs)
+
+            # If no transit, tflux = 1
+            else:
+                tflux[:] = 1
+
+            if Rp_Rs <= 0:
+                tflux[:] = 1
+
+            # Add all the contributions
+            tm = 0
+            for j in range(nintg):
+                tm += tflux[j] - vt[j]/Cs + tide[j] + alb[j]
+
+            tm = tm/nintg
+                
+        # Eclipse
+        else:
+            bp = bt/Rp_Rs
+            # Treat the star as the object blocking the light
+            occult = occ.occultUniform(bp, 1/Rp_Rs, lambdae)
+                    
+            if Rp_Rs < 0:
+                ratio = np.zeros(nintg)
+            else:
+                ratio = 1 - occult
+
+            tm = 0
+            for j in range(nintg):
+                tm += 1 - ted*ratio[j] - vt[j]/Cs + tide[j] + alb[j]
+
+            tm = tm/nintg
+
+        tm += (1 - tm)*dil # Add dilution
+            
+    # Radial velocity
+    else:
+        tm = 1
+        pass # To do
+
+    return tm # /n_planet ? To check
