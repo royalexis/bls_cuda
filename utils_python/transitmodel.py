@@ -45,7 +45,7 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
     # Calculation for multiprocessing
     if multipro:
         max_processes = os.cpu_count()
-        ndiv = nb_pts // (max_processes - 1) + 1
+        ndiv = int(np.ceil(nb_pts/max_processes))
         tmodel = np.zeros((max_processes, ndiv))
 
         iarg = np.zeros((max_processes, ndiv), dtype=np.int32)
@@ -119,9 +119,10 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
         if multipro:
             # Computes the transit using multiprocessing
             with cf.ProcessPoolExecutor(max_workers=max_processes) as executor:
-                futures = {executor.submit(compute_transit, iarg[i], tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
-                                            c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                                            w, K, ell, ag, Rp_Rs, ted, dil, ndiv) : i for i in range(max_processes)}
+                # futures = {executor.submit(compute_transit, iarg[i], tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
+                #                             c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
+                #                             w, K, ell, ag, Rp_Rs, ted, dil, ndiv) : i for i in range(max_processes)}
+                futures = {executor.submit(test): i for i in range(max_processes)}
                 
                 for future in cf.as_completed(futures):
                     i = futures[future]
@@ -136,9 +137,10 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
         else:
             # Compute with one process
             for i in range(nb_pts):
-                tmodel[i] = transitOnePoint(tflux, time[i], itime[i], dtype[i], bt, vt, tide, alb, lambdae, lambdad, etad,
-                    c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                    w, K, ell, ag, Rp_Rs, ted, dil)
+                # tmodel[i] = transitOnePoint(tflux, time[i], itime[i], dtype[i], bt, vt, tide, alb, lambdae, lambdad, etad,
+                #     c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
+                #     w, K, ell, ag, Rp_Rs, ted, dil)
+                tmodel[i] = test()
     
     # Add zero point
     for i in range(nb_pts):
@@ -262,3 +264,6 @@ def transitOnePoint(tflux, time_i, itime_i, dtype_i, bt, vt, tide, alb, lambdae,
         pass # To do
 
     return tm # /n_planet ? To check
+
+def test():
+    return
