@@ -32,16 +32,6 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
     nb_pts = len(time)
     dtype = np.zeros(nb_pts) # Photometry only
 
-    tflux = np.zeros(nintg)
-    vt = np.zeros(nintg)
-    tide = np.zeros(nintg)
-    alb = np.zeros(nintg)
-    bt = np.zeros(nintg)
-
-    lambdad = np.zeros(nintg)
-    etad = np.zeros(nintg)
-    lambdae = np.zeros(nintg)
-
     # Calculation for multiprocessing
     if multipro:
         max_processes = int(os.cpu_count() // 2)
@@ -103,10 +93,9 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
         if multipro:
             # Computes the transit using multiprocessing
             with cf.ProcessPoolExecutor(max_workers=max_processes) as executor:
-                futures = {executor.submit(compute_transit, iarg[i], tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
+                futures = {executor.submit(compute_transit, iarg[i], time, itime, dtype,
                                             c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
                                             w, K, ell, ag, Rp_Rs, ted, dil, ndiv) : i for i in range(max_processes)}
-                # futures = {executor.submit(test): i for i in range(max_processes)}
                 
                 for future in cf.as_completed(futures):
                     i = futures[future]
@@ -121,10 +110,9 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
         else:
             # Compute with one process
             for i in range(nb_pts):
-                tmodel[i] = transitOnePoint(tflux, time[i], itime[i], dtype[i], bt, vt, tide, alb, lambdae, lambdad, etad,
+                tmodel[i] = transitOnePoint(time[i], itime[i], dtype[i],
                     c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
                     w, K, ell, ag, Rp_Rs, ted, dil)
-                # tmodel[i] = test()
     
     # Add zero point
     for i in range(nb_pts):
@@ -135,7 +123,7 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
 
     return tmodel
 
-def compute_transit(iarg, tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
+def compute_transit(iarg, time, itime, dtype,
                     c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
                     w, K, ell, ag, Rp_Rs, ted, dil, ndiv):
     """This function computes all the the transit points that a certain process calculates"""
@@ -143,7 +131,7 @@ def compute_transit(iarg, tflux, time, itime, dtype, bt, vt, tide, alb, lambdae,
     tm = np.zeros(ndiv)
 
     for j, i in enumerate(iarg):
-        tm[j] = transitOnePoint(tflux, time[i], itime[i], dtype[i], bt, vt, tide, alb, lambdae, lambdad, etad,
+        tm[j] = transitOnePoint(time[i], itime[i], dtype[i],
                     c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
                     w, K, ell, ag, Rp_Rs, ted, dil)
         
@@ -151,12 +139,22 @@ def compute_transit(iarg, tflux, time, itime, dtype, bt, vt, tide, alb, lambdae,
 
 
 @njit
-def transitOnePoint(tflux, time_i, itime_i, dtype_i, bt, vt, tide, alb, lambdae, lambdad, etad,
+def transitOnePoint(time_i, itime_i, dtype_i,
                     c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
                     w, K, ell, ag, Rp_Rs, ted, dil):
     """This function computes the transit model for a single point"""
 
     ttcor = 0 # For now
+
+    tflux = np.zeros(nintg)
+    vt = np.zeros(nintg)
+    tide = np.zeros(nintg)
+    alb = np.zeros(nintg)
+    bt = np.zeros(nintg)
+
+    lambdad = np.zeros(nintg)
+    etad = np.zeros(nintg)
+    lambdae = np.zeros(nintg)
 
     for j in range(nintg):
                 
@@ -248,6 +246,3 @@ def transitOnePoint(tflux, time_i, itime_i, dtype_i, bt, vt, tide, alb, lambdae,
         pass # To do
 
     return tm # /n_planet ? To check
-
-def test():
-    return
