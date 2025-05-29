@@ -44,7 +44,7 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
 
     # Calculation for multiprocessing
     if multipro:
-        max_processes = os.cpu_count()
+        max_processes = int(os.cpu_count() // 2)
         ndiv = int(np.ceil(nb_pts/max_processes))
         tmodel = np.zeros((max_processes, ndiv))
 
@@ -100,29 +100,13 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
         d_Rs = kep.distance(a_Rs, eccn, Tanom) # Distance over R*
         incl = np.arccos(b/d_Rs)
 
-
-        """
-        To Implement multiprocessing
-
-        - Copy the inside of the nb_pts loop to a seperate njit function (equivalent to bls_kernel())
-            -> The function returns the tmodel for one point
-        - Make a wrapper to that function that calculates all the points for a certain process (equivalent to compute_bls_kernel())
-        - Replace the loop over the points to a process pool executor, making sure to give the right arguments to the function.
-            -> There will be a lot of args: (time, itime, epoch, bt, vt, ...)
-            -> This might require creating a 2D array containing indices to get the time_i and itime_i (equivalent to the iarg array)
-        - I will have to remove the njit decorator of this main function.
-            -> This means probably putting the code above to a seperate njit function
-
-        To do eventually: Use most of the resources where there's lot of computation (where there is a transit)
-        """
-
         if multipro:
             # Computes the transit using multiprocessing
             with cf.ProcessPoolExecutor(max_workers=max_processes) as executor:
-                # futures = {executor.submit(compute_transit, iarg[i], tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
-                #                             c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                #                             w, K, ell, ag, Rp_Rs, ted, dil, ndiv) : i for i in range(max_processes)}
-                futures = {executor.submit(test): i for i in range(max_processes)}
+                futures = {executor.submit(compute_transit, iarg[i], tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
+                                            c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
+                                            w, K, ell, ag, Rp_Rs, ted, dil, ndiv) : i for i in range(max_processes)}
+                # futures = {executor.submit(test): i for i in range(max_processes)}
                 
                 for future in cf.as_completed(futures):
                     i = futures[future]
@@ -137,10 +121,10 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
         else:
             # Compute with one process
             for i in range(nb_pts):
-                # tmodel[i] = transitOnePoint(tflux, time[i], itime[i], dtype[i], bt, vt, tide, alb, lambdae, lambdad, etad,
-                #     c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                #     w, K, ell, ag, Rp_Rs, ted, dil)
-                tmodel[i] = test()
+                tmodel[i] = transitOnePoint(tflux, time[i], itime[i], dtype[i], bt, vt, tide, alb, lambdae, lambdad, etad,
+                    c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
+                    w, K, ell, ag, Rp_Rs, ted, dil)
+                # tmodel[i] = test()
     
     # Add zero point
     for i in range(nb_pts):
