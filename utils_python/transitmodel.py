@@ -10,7 +10,7 @@ from numba import njit
 G = 6.674e-11
 Cs = 2.99792458e8
 
-def transitModel(sol, time, itime, nintg=41):
+def transitModel(sol, time, itime, nintg=41, multipro=False):
     """
     Transit Model
     """
@@ -42,15 +42,18 @@ def transitModel(sol, time, itime, nintg=41):
     etad = np.zeros(nintg)
     lambdae = np.zeros(nintg)
 
-    # Calculation for multithreading
-    max_processes = os.cpu_count()
-    ndiv = nb_pts // (max_processes - 1) + 1
-    tmodel = np.zeros((max_processes, ndiv))
+    # Calculation for multiprocessing
+    if multipro:
+        max_processes = os.cpu_count()
+        ndiv = nb_pts // (max_processes - 1) + 1
+        tmodel = np.zeros((max_processes, ndiv))
 
-    iarg = np.zeros((max_processes, ndiv), dtype=np.int32)
-    for i in range(0, max_processes):
-        for k, j in enumerate(range(i, nb_pts, max_processes)):
-            iarg[i, k] = j
+        iarg = np.zeros((max_processes, ndiv), dtype=np.int32)
+        for i in range(0, max_processes):
+            for k, j in enumerate(range(i, nb_pts, max_processes)):
+                iarg[i, k] = j
+    else:
+        tmodel = np.zeros(nb_pts)
 
     # Temporary
     n_planet = 1
@@ -113,21 +116,29 @@ def transitModel(sol, time, itime, nintg=41):
         To do eventually: Use most of the resources where there's lot of computation (where there is a transit)
         """
 
-        # Computes the transit using multiprocessing
-        with cf.ProcessPoolExecutor(max_workers=max_processes) as executor:
-            futures = {executor.submit(compute_transit, iarg[i], tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
-                                        c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                                        w, K, ell, ag, Rp_Rs, ted, dil, ndiv) : i for i in range(max_processes)}
-            
-            for future in cf.as_completed(futures):
-                i = futures[future]
-                try:
-                    result = future.result()
-                    tmodel[i,:] = result
-                except Exception as exc:
-                    print(f'Generated an exception: {exc}')
+        if multipro:
+            # Computes the transit using multiprocessing
+            with cf.ProcessPoolExecutor(max_workers=max_processes) as executor:
+                futures = {executor.submit(compute_transit, iarg[i], tflux, time, itime, dtype, bt, vt, tide, alb, lambdae, lambdad, etad,
+                                            c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
+                                            w, K, ell, ag, Rp_Rs, ted, dil, ndiv) : i for i in range(max_processes)}
+                
+                for future in cf.as_completed(futures):
+                    i = futures[future]
+                    try:
+                        result = future.result()
+                        tmodel[i,:] = result
+                    except Exception as exc:
+                        print(f'Generated an exception: {exc}')
 
-        tmodel = tmodel.T.ravel()[:nb_pts]
+            tmodel = tmodel.T.ravel()[:nb_pts]
+
+        else:
+            # Compute with one process
+            for i in range(nb_pts):
+                tmodel[i] = transitOnePoint(tflux, time[i], itime[i], dtype[i], bt, vt, tide, alb, lambdae, lambdad, etad,
+                    c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
+                    w, K, ell, ag, Rp_Rs, ted, dil)
     
     # Add zero point
     for i in range(nb_pts):
