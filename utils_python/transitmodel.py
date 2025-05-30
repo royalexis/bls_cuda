@@ -93,7 +93,7 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
         if multipro:
             # Computes the transit using multiprocessing
             with cf.ProcessPoolExecutor(max_workers=max_processes) as executor:
-                futures = {executor.submit(compute_transit, iarg[i], time, itime, dtype,
+                futures = {executor.submit(compute_transit, time[iarg[i,:]], itime[iarg[i,:]], dtype[iarg[i,:]],
                                             c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
                                             w, K, ell, ag, Rp_Rs, ted, dil, ndiv) : i for i in range(max_processes)}
                 
@@ -123,15 +123,15 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
 
     return tmodel
 
-def compute_transit(iarg, time, itime, dtype,
+def compute_transit(time, itime, dtype,
                     c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
                     w, K, ell, ag, Rp_Rs, ted, dil, ndiv):
     """This function computes all the the transit points that a certain process calculates"""
     
     tm = np.zeros(ndiv)
 
-    for j, i in enumerate(iarg):
-        tm[j] = transitOnePoint(time[i], itime[i], dtype[i],
+    for i in range(ndiv):
+        tm[i] = transitOnePoint(time[i], itime[i], dtype[i],
                     c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
                     w, K, ell, ag, Rp_Rs, ted, dil)
         
