@@ -168,7 +168,7 @@ def transitOnePoint(time_i, itime_i, dtype_i,
         Manom = phi * tPi + phi0
 
         # Make sure Manom is in [0, 2pi]
-        Manom % tPi
+        Manom = Manom % tPi
                 
         Eanom = kep.solve_kepler_eq(eccn, Manom, Eanom)
         Tanom = kep.trueAnomaly(eccn, Eanom)
