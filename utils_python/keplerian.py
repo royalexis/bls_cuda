@@ -35,3 +35,14 @@ def solve_kepler_eq(eccn, Manom, Eanom, thres=1e-6, itmax=100):
         i += 1
 
     return Eanom
+
+@njit
+def transitDuration(a_Rs, Rp_Rs, P, b):
+    """
+    Calculates the transit duration
+    """
+
+    temp1 = (1 + Rp_Rs)**2 - b*b
+    temp2 = 1 - (b/a_Rs)**2
+
+    return P/np.pi * np.arcsin(1/a_Rs * np.sqrt(temp1/temp2))

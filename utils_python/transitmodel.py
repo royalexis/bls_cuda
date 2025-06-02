@@ -10,7 +10,7 @@ from numba import njit
 G = 6.674e-11
 Cs = 2.99792458e8
 
-def transitModel(sol, time, itime, nintg=41, multipro=False):
+def transitModel(sol, time, itime, nintg=41, multipro=False, calculate_transit=True):
     """
     Transit Model
     """
@@ -93,9 +93,12 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
         if multipro:
             # Computes the transit using multiprocessing
             with cf.ProcessPoolExecutor(max_workers=max_processes) as executor:
-                futures = {executor.submit(compute_transit, time[iarg[i,:]], itime[iarg[i,:]], dtype[iarg[i,:]],
-                                            c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                                            w, K, ell, ag, Rp_Rs, ted, dil, ndiv) : i for i in range(max_processes)}
+                params = np.array([c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn,
+                                   a_Rs, incl, Eanom, w, K, ell, ag, Rp_Rs, ted, dil, ndiv])
+                futures = {}
+                for i in range(max_processes):
+                    indices = iarg[i,:]
+                    futures[executor.submit(compute_transit, time[indices], itime[indices], dtype[indices], params)] = i
                 
                 for future in cf.as_completed(futures):
                     i = futures[future]
@@ -112,7 +115,7 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
             for i in range(nb_pts):
                 tmodel[i] = transitOnePoint(time[i], itime[i], dtype[i],
                     c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                    w, K, ell, ag, Rp_Rs, ted, dil)
+                    w, K, ell, ag, Rp_Rs, ted, dil, calculate_transit=calculate_transit)
     
     # Add zero point
     for i in range(nb_pts):
@@ -123,17 +126,14 @@ def transitModel(sol, time, itime, nintg=41, multipro=False):
 
     return tmodel
 
-def compute_transit(time, itime, dtype,
-                    c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                    w, K, ell, ag, Rp_Rs, ted, dil, ndiv):
+def compute_transit(time, itime, dtype, params):
     """This function computes all the the transit points that a certain process calculates"""
     
+    ndiv = int(params[-1])
     tm = np.zeros(ndiv)
 
     for i in range(ndiv):
-        tm[i] = transitOnePoint(time[i], itime[i], dtype[i],
-                    c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                    w, K, ell, ag, Rp_Rs, ted, dil)
+        tm[i] = transitOnePoint(time[i], itime[i], dtype[i], *params[:-1])
         
     return tm
 
@@ -141,11 +141,12 @@ def compute_transit(time, itime, dtype,
 @njit
 def transitOnePoint(time_i, itime_i, dtype_i,
                     c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                    w, K, ell, ag, Rp_Rs, ted, dil):
+                    w, K, ell, ag, Rp_Rs, ted, dil, calculate_transit=True):
     """This function computes the transit model for a single point"""
 
     ttcor = 0 # For now
 
+    nintg = int(nintg)
     tflux = np.zeros(nintg)
     vt = np.zeros(nintg)
     tide = np.zeros(nintg)
@@ -185,7 +186,7 @@ def transitOnePoint(time_i, itime_i, dtype_i,
         tide[j] = ell * (d_Rs/a_Rs)**(1/3) * np.cos(2*(Tanom-w + np.pi/2))
         alb[j] = albedoMod(Tanom - w, ag) * a_Rs/d_Rs
             
-    if dtype_i == 0:
+    if dtype_i == 0 and calculate_transit:
         if y2 >= 0:
             # Check for transit
             is_transit = 0
