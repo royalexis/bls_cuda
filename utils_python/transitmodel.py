@@ -32,16 +32,6 @@ def transitModel(sol, time, itime, nintg=41):
     tmodel = np.zeros(nb_pts)
     dtype = np.zeros(nb_pts) # Photometry only
 
-    tflux = np.zeros(nintg)
-    vt = np.zeros(nintg)
-    tide = np.zeros(nintg)
-    alb = np.zeros(nintg)
-    bt = np.zeros(nintg)
-
-    lambdad = np.zeros(nintg)
-    etad = np.zeros(nintg)
-    lambdae = np.zeros(nintg)
-
     # Temporary
     n_planet = 1
 
@@ -70,8 +60,7 @@ def transitModel(sol, time, itime, nintg=41):
                 w += 2*np.pi
 
         # Calculate a/R*
-        #a_Rs = (4*np.pi/3 * density * Per * Per) ** (1/3) # There is something wrong with this formula (probably a unit problem)
-        a_Rs = 10 * (density * G * (Per*86400)**2 / (3*np.pi)) ** (1/3)
+        a_Rs = 10 * np.cbrt(density * G * (Per*86400)**2 / (3*np.pi))
 
         K = sol[10*ii + 8 + 6] # RV amplitude
         ted = sol[10*ii + 8 + 7]/1e6 # Occultation Depth
@@ -85,7 +74,8 @@ def transitModel(sol, time, itime, nintg=41):
         # Calculate inclinaison
         Tanom = kep.trueAnomaly(eccn, Eanom)
         d_Rs = kep.distance(a_Rs, eccn, Tanom) # Distance over R*
-        incl = np.arccos(b/d_Rs)
+        cincl = b/d_Rs # cos(incl)
+        eccsw = eccn*np.sin(w)
         y2 = 0
 
         # Loop over all of the points
@@ -93,6 +83,16 @@ def transitModel(sol, time, itime, nintg=41):
             ttcor = 0 # For now
             time_i = time[i]
             itime_i = itime[i]
+
+            tflux = np.empty(nintg)
+            vt = np.empty(nintg)
+            tide = np.empty(nintg)
+            alb = np.empty(nintg)
+            bt = np.empty(nintg)
+
+            lambdad = np.empty(nintg)
+            etad = np.empty(nintg)
+            lambdae = np.empty(nintg)
 
             for j in range(nintg):
                 
@@ -103,26 +103,21 @@ def transitModel(sol, time, itime, nintg=41):
                 Manom = phi * 2*np.pi + phi0
 
                 # Make sure Manom is in [0, 2pi]
-                if (Manom > 2*np.pi):
-                    Manom -= 2*np.pi
-                if (Manom < 0):
-                    Manom += 2*np.pi
+                Manom = Manom % (2*np.pi)
                 
-                Eanom = kep.solve_kepler_eq(eccn, Manom, Manom)
+                Eanom = kep.solve_kepler_eq(eccn, Manom, Manom) # Use Manom as the guess for Eanom, otherwise we have a race condition problem
                 Tanom = kep.trueAnomaly(eccn, Eanom)
                 d_Rs = kep.distance(a_Rs, eccn, Tanom)
 
-                x2 = d_Rs * np.sin(Tanom-w)
-                y2 = d_Rs * np.cos(Tanom-w)*np.cos(incl)
+                x2 = d_Rs * np.sin(Tanom - w)
+                y2 = d_Rs * np.cos(Tanom - w)*cincl
 
                 bt[j] = np.sqrt(x2*x2 + y2*y2)
 
                 # Calculation of RV, ellip and albedo here
 
-                vt[j] = K * (np.cos(Tanom - w + np.pi/2) + eccn*np.cos(-w + np.pi/2))
-
-                tide[j] = ell * (d_Rs/a_Rs)**(1/3) * np.cos(2*(Tanom-w + np.pi/2))
-
+                vt[j] = K * (-np.sin(Tanom - w) + eccsw)
+                tide[j] = ell * np.cbrt(d_Rs/a_Rs) * -np.cos(2*(Tanom - w))
                 alb[j] = albedoMod(Tanom - w, ag) * a_Rs/d_Rs
             
             if dtype[i] == 0:
