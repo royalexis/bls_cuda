@@ -145,15 +145,19 @@ def transitOnePoint(time_i, itime_i, dtype_i,
     ttcor = 0 # For now
 
     nintg = int(nintg)
-    tflux = np.zeros(nintg)
-    vt = np.zeros(nintg)
-    tide = np.zeros(nintg)
-    alb = np.zeros(nintg)
-    bt = np.zeros(nintg)
+    tflux = np.empty(nintg)
+    vt = np.empty(nintg)
+    tide = np.empty(nintg)
+    alb = np.empty(nintg)
+    bt = np.empty(nintg)
 
-    lambdad = np.zeros(nintg)
-    etad = np.zeros(nintg)
-    lambdae = np.zeros(nintg)
+    lambdad = np.empty(nintg)
+    etad = np.empty(nintg)
+    lambdae = np.empty(nintg)
+
+    tPi = 2*np.pi
+    cincl = np.cos(incl)
+    eccnsw = eccn*np.sin(w)
 
     for j in range(nintg):
                 
@@ -161,27 +165,24 @@ def transitOnePoint(time_i, itime_i, dtype_i,
         t = time_i - itime_i * (0.5 - 1/(2*nintg) - j/nintg) - epoch - ttcor
 
         phi = t/Per - np.floor(t/Per)
-        Manom = phi * 2*np.pi + phi0
+        Manom = phi * tPi + phi0
 
         # Make sure Manom is in [0, 2pi]
-        if (Manom > 2*np.pi):
-            Manom -= 2*np.pi
-        if (Manom < 0):
-            Manom += 2*np.pi
+        Manom % tPi
                 
         Eanom = kep.solve_kepler_eq(eccn, Manom, Eanom)
         Tanom = kep.trueAnomaly(eccn, Eanom)
         d_Rs = kep.distance(a_Rs, eccn, Tanom)
 
-        x2 = d_Rs * np.sin(Tanom-w)
-        y2 = d_Rs * np.cos(Tanom-w)*np.cos(incl)
+        x2 = d_Rs * np.sin(Tanom - w)
+        y2 = d_Rs * np.cos(Tanom - w)*cincl
 
         bt[j] = np.sqrt(x2*x2 + y2*y2)
 
         # Calculation of RV, ellip and albedo here
 
-        vt[j] = K * (np.cos(Tanom - w + np.pi/2) + eccn*np.cos(-w + np.pi/2))
-        tide[j] = ell * (d_Rs/a_Rs)**(1/3) * np.cos(2*(Tanom-w + np.pi/2))
+        vt[j] = K * (-np.cos(Tanom - w) + eccnsw)
+        tide[j] = ell * np.cbrt(d_Rs/a_Rs) * -np.cos(2*(Tanom - w))
         alb[j] = albedoMod(Tanom - w, ag) * a_Rs/d_Rs
             
     if dtype_i == 0 and calculate_transit:
