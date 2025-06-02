@@ -43,6 +43,7 @@ def transitModel(sol, time, itime, nintg=41, multipro=False, calculate_transit=T
             for k, j in enumerate(range(i, nb_pts, max_processes)):
                 iarg[i, k] = j
     else:
+        ndiv = 0 # Set variable to avoid errors
         tmodel = np.zeros(nb_pts)
 
     # Temporary
@@ -73,7 +74,6 @@ def transitModel(sol, time, itime, nintg=41, multipro=False, calculate_transit=T
                 w += 2*np.pi
 
         # Calculate a/R*
-        #a_Rs = (4*np.pi/3 * density * Per * Per) ** (1/3) # There is something wrong with this formula (probably a unit problem)
         a_Rs = 10 * (density * G * (Per*86400)**2 / (3*np.pi)) ** (1/3)
 
         K = sol[10*ii + 8 + 6] # RV amplitude
@@ -90,11 +90,12 @@ def transitModel(sol, time, itime, nintg=41, multipro=False, calculate_transit=T
         d_Rs = kep.distance(a_Rs, eccn, Tanom) # Distance over R*
         incl = np.arccos(b/d_Rs)
 
+        params = np.array([c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn,
+                           a_Rs, incl, Eanom, w, K, ell, ag, Rp_Rs, ted, dil, ndiv])
+
         if multipro:
             # Computes the transit using multiprocessing
             with cf.ProcessPoolExecutor(max_workers=max_processes) as executor:
-                params = np.array([c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn,
-                                   a_Rs, incl, Eanom, w, K, ell, ag, Rp_Rs, ted, dil, ndiv])
                 futures = {}
                 for i in range(max_processes):
                     indices = iarg[i,:]
@@ -113,9 +114,7 @@ def transitModel(sol, time, itime, nintg=41, multipro=False, calculate_transit=T
         else:
             # Compute with one process
             for i in range(nb_pts):
-                tmodel[i] = transitOnePoint(time[i], itime[i], dtype[i],
-                    c1, c2, c3, c4, a1, a2, nintg, epoch, Per, phi0, eccn, a_Rs, incl, Eanom,
-                    w, K, ell, ag, Rp_Rs, ted, dil, calculate_transit=calculate_transit)
+                tmodel[i] = transitOnePoint(time[i], itime[i], dtype[i], *params[:-1], calculate_transit=calculate_transit)
     
     # Add zero point
     for i in range(nb_pts):
@@ -136,7 +135,6 @@ def compute_transit(time, itime, dtype, params):
         tm[i] = transitOnePoint(time[i], itime[i], dtype[i], *params[:-1])
         
     return tm
-
 
 @njit
 def transitOnePoint(time_i, itime_i, dtype_i,
