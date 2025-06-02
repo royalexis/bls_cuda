@@ -2,13 +2,13 @@ import numpy as np
 import utils_python.keplerian as kep
 import utils_python.occult as occ
 from utils_python.effects import albedoMod
-from numba import njit
+from numba import njit, prange
 
 # Constants
 G = 6.674e-11
 Cs = 2.99792458e8
 
-@njit
+@njit(parallel=True)
 def transitModel(sol, time, itime, nintg=41):
     """
     Transit Model
@@ -86,9 +86,10 @@ def transitModel(sol, time, itime, nintg=41):
         Tanom = kep.trueAnomaly(eccn, Eanom)
         d_Rs = kep.distance(a_Rs, eccn, Tanom) # Distance over R*
         incl = np.arccos(b/d_Rs)
+        y2 = 0
 
         # Loop over all of the points
-        for i in range(nb_pts):
+        for i in prange(nb_pts):
             ttcor = 0 # For now
             time_i = time[i]
             itime_i = itime[i]
@@ -107,7 +108,7 @@ def transitModel(sol, time, itime, nintg=41):
                 if (Manom < 0):
                     Manom += 2*np.pi
                 
-                Eanom = kep.solve_kepler_eq(eccn, Manom, Eanom)
+                Eanom = kep.solve_kepler_eq(eccn, Manom, Manom)
                 Tanom = kep.trueAnomaly(eccn, Eanom)
                 d_Rs = kep.distance(a_Rs, eccn, Tanom)
 
