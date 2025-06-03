@@ -8,7 +8,7 @@ from numba import njit, prange
 G = 6.674e-11
 Cs = 2.99792458e8
 
-@njit(parallel=True)
+@njit(parallel=True, cache=True)
 def transitModel(sol, time, itime, nintg=41):
     """
     Transit Model
@@ -76,7 +76,7 @@ def transitModel(sol, time, itime, nintg=41):
         d_Rs = kep.distance(a_Rs, eccn, Tanom) # Distance over R*
         cincl = b/d_Rs # cos(incl)
         eccsw = eccn*np.sin(w)
-        y2 = 0
+        y2 = 0 # We define y2 to avoid an error in the prange
 
         # Loop over all of the points
         for i in prange(nb_pts):
@@ -109,16 +109,21 @@ def transitModel(sol, time, itime, nintg=41):
                 Tanom = kep.trueAnomaly(eccn, Eanom)
                 d_Rs = kep.distance(a_Rs, eccn, Tanom)
 
-                x2 = d_Rs * np.sin(Tanom - w)
-                y2 = d_Rs * np.cos(Tanom - w)*cincl
+                # Precompute some variables
+                Tanom_w = Tanom - w
+                sTanom_w = np.sin(Tanom_w)
+                cTanom_w = np.cos(Tanom_w)
+
+                x2 = d_Rs * sTanom_w
+                y2 = d_Rs * cTanom_w*cincl
 
                 bt[j] = np.sqrt(x2*x2 + y2*y2)
 
                 # Calculation of RV, ellip and albedo here
 
-                vt[j] = K * (-np.sin(Tanom - w) + eccsw)
-                tide[j] = ell * np.cbrt(d_Rs/a_Rs) * -np.cos(2*(Tanom - w))
-                alb[j] = albedoMod(Tanom - w, ag) * a_Rs/d_Rs
+                vt[j] = K * (eccsw - sTanom_w)
+                tide[j] = ell * np.cbrt(d_Rs/a_Rs) * (sTanom_w*sTanom_w - cTanom_w*cTanom_w)
+                alb[j] = albedoMod(Tanom_w, ag) * a_Rs/d_Rs
             
             if dtype[i] == 0:
                 if y2 >= 0:
