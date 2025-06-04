@@ -24,17 +24,14 @@ def solve_kepler_eq(eccn, Manom, Eanom, thres=1e-6, itmax=100):
     Solves the Kepler equation using the Newton-Raphson method
     """
 
-    # First calculation to find diff
-    Eold = max(Eanom, 0.0001)
-    Eanom = Eanom - (Eanom - eccn*np.sin(Eanom) - Manom) / (1 - eccn*np.cos(Eanom))
-    diff = abs(1 - Eanom/Eold)
-    Eold = Eanom
-
+    diff = 1
     i = 0
+
     while (diff >= thres and i < itmax):
-        Eanom = Eanom - (Eanom - eccn*np.sin(Eanom) - Manom) / (1 - eccn*np.cos(Eanom))
-        diff = abs(1 - Eanom/Eold)
-        Eold = Eanom
+        diff = (Eanom - eccn*np.sin(Eanom) - Manom) / (1 - eccn*np.cos(Eanom))
+        Eanom -= diff
+        
+        diff = abs(diff)
         i += 1
 
     return Eanom
