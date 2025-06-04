@@ -80,7 +80,7 @@ def occultQuad(z0, u1, u2, p):
                 lambdad[i] = lambda3(p, 1/(2*p))
                 etad[i] = eta1(kap0, kap1, p, z, a, b)
 
-                if p == 0.5:
+                if abs(p - 0.5) < 1e-3:
                     lambdad[i] = 1/3 - 4/(9*np.pi)
                     etad[i] = 3/32
 
@@ -101,11 +101,11 @@ def occultQuad(z0, u1, u2, p):
 
         # Transits the source
         elif p <= 1 and z <= (1 - p) * 1.0001:
-            k = np.sqrt((b-a)/(1-a)) # k^(-1)
-            if k > 1:
-                k = 0.99999
+            k_i = np.sqrt((b-a)/(1-a)) # k^(-1)
+            if k_i > 1:
+                k_i = 0.99999
             
-            lambdad[i] = lambda2(p, z, 1/k, a, b, q)
+            lambdad[i] = lambda2(p, z, k_i, a, b, q)
             if z < p:
                 lambdad[i] += 2/3
             if abs(p + z - 1) <= 1e-4:
@@ -128,10 +128,10 @@ def lambda1(p, z, k, a, b, q):
     return 1/(9*np.pi*np.sqrt(p*z)) * (temp1 + temp2 - 3*q/a * Pk)
 
 @njit
-def lambda2(p, z, k, a, b, q):
-    Kk = ellK(1/k)
-    Ek = ellE(1/k)
-    Pk = ellPi((a-b)/a, 1/k)
+def lambda2(p, z, k_i, a, b, q):
+    Kk = ellK(k_i)
+    Ek = ellE(k_i)
+    Pk = ellPi((a-b)/a, k_i)
 
     temp1 = (1 - 5*z*z + p*p + q*q) * Kk
     temp2 = (1 - a) * (z*z + 7*p*p - 4) * Ek
