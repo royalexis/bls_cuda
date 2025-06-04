@@ -3,8 +3,10 @@ from utils_python.elliptic_int import ellE, ellK, ellPi
 from numba import njit
 
 @njit
-def occultUniform(z0, p, lambdae):
+def occultUniform(z0, p):
     n = len(z0)
+
+    lambdae = np.empty(n)
 
     for i in range(n):
         z = z0[i]
@@ -30,8 +32,12 @@ def occultUniform(z0, p, lambdae):
     return 1 - lambdae
 
 @njit
-def occultQuad(z0, u1, u2, p, lambdad, etad, lambdae):
+def occultQuad(z0, u1, u2, p):
     n = len(z0)
+
+    lambdad = np.empty(n)
+    etad = np.empty(n)
+    lambdae = np.empty(n)
 
     # Omega is actually 4*Omega in the paper
     Omega = 1 - u1/3 - u2/6
@@ -41,8 +47,6 @@ def occultQuad(z0, u1, u2, p, lambdad, etad, lambdae):
         a = (z - p) ** 2
         b = (z + p) ** 2
         q = p*p - z*z
-        kap1 = np.arccos(max(-1, min((1 - p*p + z*z) / (2*z), 1)))
-        kap0 = np.arccos(max(-1, min((p*p + z*z - 1) / (2*p*z), 1)))
 
         ### lambdae Calculation
 
@@ -60,6 +64,8 @@ def occultQuad(z0, u1, u2, p, lambdad, etad, lambdae):
 
         # Partially obscured and crossing star
         elif (abs(1 - p) < z <= (1 + p)):
+            kap1 = np.arccos(max(-1, min((1 - p*p + z*z) / (2*z), 1)))
+            kap0 = np.arccos(max(-1, min((p*p + z*z - 1) / (2*p*z), 1)))
             lambdae[i] = (p*p*kap0 + kap1 - 0.5 * np.sqrt(max(4*z*z - (1 + z*z - p*p)**2, 0))) / np.pi
 
         # Partially obscured

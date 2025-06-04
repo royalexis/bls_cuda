@@ -90,10 +90,6 @@ def transitModel(sol, time, itime, nintg=41):
             alb = np.empty(nintg)
             bt = np.empty(nintg)
 
-            lambdad = np.empty(nintg)
-            etad = np.empty(nintg)
-            lambdae = np.empty(nintg)
-
             for j in range(nintg):
                 
                 # Time-Convolution
@@ -137,11 +133,11 @@ def transitModel(sol, time, itime, nintg=41):
                     if is_transit:
                         # Quadratic coefficients
                         if (c3 == 0 and c4 == 0):
-                            tflux = occ.occultQuad(bt, c1, c2, Rp_Rs, lambdad, etad, lambdae)
+                            tflux = occ.occultQuad(bt, c1, c2, Rp_Rs)
                         
                         # Kipping coefficients
                         elif (c1 == 0 and c2 == 0):
-                            tflux = occ.occultQuad(bt, a1, a2, Rp_Rs, lambdad, etad, lambdae)
+                            tflux = occ.occultQuad(bt, a1, a2, Rp_Rs)
                         
                         # Non linear
                         else:
@@ -165,7 +161,7 @@ def transitModel(sol, time, itime, nintg=41):
                 else:
                     bp = bt/Rp_Rs
                     # Treat the star as the object blocking the light
-                    occult = occ.occultUniform(bp, 1/Rp_Rs, lambdae)
+                    occult = occ.occultUniform(bp, 1/Rp_Rs)
                     
                     if Rp_Rs < 0:
                         ratio = np.zeros(nintg)
