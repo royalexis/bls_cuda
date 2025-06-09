@@ -2,6 +2,35 @@ import numpy as np
 from scipy.optimize import least_squares
 from utils_python.transitmodel import transitModel
 
+def fitFromBLS(gbls_ans, time, flux, ferror, itime):
+    """
+    Fits a transit model using the answers from the bls algorithm
+    """
+    id_to_fit = np.array([0, 7, 8, 9, 10, 11]) # We fit only: rho, zpt, t0, Per, b, Rp/Rs
+
+    sol = np.zeros(18) # Single planet model has up-to 18-model parameters
+
+    sol[0]  = 0.6  # Mean stellar density (g/cm^3)
+    sol[1]  = 0.0  # Only used for non-linear limb-darkening
+    sol[2]  = 0.0  # Only used for non-linear limb-darkening
+    sol[3]  = 0.6  # q1 (limb-darkening)
+    sol[4]  = 0.4  # q2 (limb-darkening)
+    sol[5]  = 0.0  # dilution
+    sol[6]  = 0.0  # Velocity offset
+    sol[7]  = 0.0  # Photometric zero point
+    sol[8]  = gbls_ans.epo             # Center of transit time (days)
+    sol[9]  = gbls_ans.bper            # Orbital Period (days)
+    sol[10] = 0.5                      # Impact parameter
+    sol[11] = np.sqrt(gbls_ans.depth)  # Rp/R*
+    sol[12] = 0.0  # sqrt(e)cos(w)
+    sol[13] = 0.0  # sqrt(e)sin(w)
+    sol[14] = 0.0  # RV amplitude (m/s)
+    sol[15] = 0.0  # thermal eclipse depth (ppm)
+    sol[16] = 0.0  # Ellipsodial variations (ppm)
+    sol[17] = 0.0  # Albedo amplitude (ppm)
+
+    return fitTransitModel(sol, id_to_fit, time, flux, ferror, itime)
+
 def createBounds(time, id_to_fit):
     """
     Creates the bounds for the parameters
@@ -14,27 +43,25 @@ def createBounds(time, id_to_fit):
 
     return (lower_bound[id_to_fit], upper_bound[id_to_fit])
 
-def fitTransitModel(sol, time, flux, ferror, itime):
+def fitTransitModel(sol, id_to_fit, time, flux, ferror, itime):
     """
     Function to call for fitting
     """
 
     # Fit only the parameters in id_to_fit
-    id_to_fit = np.array([0, 8, 10, 11])
     sol_full = np.copy(sol) # Copy the initial guess
     def wrapperTransit(sol_free, time, flux, ferror, itime):
-        for i, id in enumerate(id_to_fit):
-            sol_full[id] = sol_free[i]
+        for i, ind in enumerate(id_to_fit):
+            sol_full[ind] = sol_free[i]
         return transitToOptimize(sol_full, time, flux, ferror, itime)
     
     bounds = createBounds(time, id_to_fit)
 
     res = least_squares(wrapperTransit, sol[id_to_fit], bounds=bounds, args=(time, flux, ferror, itime))
 
-    # Recreate the solution with the fixed params
-    sol_full = np.copy(sol)
-    for i, id in enumerate(id_to_fit):
-        sol_full[id] = res.x[i]
+    # Recreate the full solution with the result
+    for i, ind in enumerate(id_to_fit):
+        sol_full[ind] = res.x[i]
 
     return sol_full
 
