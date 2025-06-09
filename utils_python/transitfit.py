@@ -10,6 +10,9 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
 
     sol = np.zeros(18) # Single planet model has up-to 18-model parameters
 
+    # Set the initial guess using the bls answers.
+    # ld coeff and rho are temporary values
+
     sol[0]  = 0.6  # Mean stellar density (g/cm^3)
     sol[1]  = 0.0  # Only used for non-linear limb-darkening
     sol[2]  = 0.0  # Only used for non-linear limb-darkening

@@ -37,10 +37,18 @@ def solve_kepler_eq(eccn, Manom, Eanom, thres=1e-6, itmax=100):
     return Eanom
 
 @njit
-def transitDuration(a_Rs, Rp_Rs, P, b):
+def transitDuration(sol):
     """
     Calculates the transit duration
     """
+    G = 6.674e-11
+
+    density = sol[0]
+    P = sol[9]
+    b = sol[10]
+    Rp_Rs = sol[11]
+
+    a_Rs = 10 * np.cbrt(density * G * (P*86400)**2 / (3*np.pi))
 
     temp1 = (1 + Rp_Rs)**2 - b*b
     temp2 = 1 - (b/a_Rs)**2
