@@ -86,7 +86,7 @@ def occultQuad(z0, u1, u2, p):
                     etad = 3/32
 
             else:
-                lambdad = lambda4(p, 1/(2*p))
+                lambdad = lambda4(p, 2*p)
                 etad = eta2(p, z)
 
         # Partly occults the source
@@ -142,8 +142,8 @@ def lambda2(p, z, k_i, a, b, q):
 
 @njit
 def lambda3(p, k):
-    Kk = ellK(1/(2*k))
-    Ek = ellE(1/(2*k))
+    Kk = ellK(k)
+    Ek = ellE(k)
 
     temp1 = 16*p/(9*np.pi) * (2*p*p - 1) * Ek
     temp2 = Kk / (9*np.pi*p) * (1 - 4*p*p) * (3 - 8*p*p)
@@ -152,8 +152,8 @@ def lambda3(p, k):
 
 @njit
 def lambda4(p, k):
-    Kk = ellK(2*k)
-    Ek = ellE(2*k)
+    Kk = ellK(k)
+    Ek = ellE(k)
 
     temp1 = 4 * (2*p*p - 1) * Ek
     temp2 = (1 - 4*p*p) * Kk
