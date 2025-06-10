@@ -71,10 +71,16 @@ def transitModel(sol, time, itime, nintg=41):
         Eanom = 2 * np.arctan(np.tan(w/2) * np.sqrt((1 - eccn)/(1 + eccn)))
         phi0 = Eanom - eccn*np.sin(Eanom)
 
+        # To avoid calculating transit twice if b=0 (y2=0 then)
+        if b == 0:
+            b = 1e-10
+
         # Calculate inclinaison
         Tanom = kep.trueAnomaly(eccn, Eanom)
         d_Rs = kep.distance(a_Rs, eccn, Tanom) # Distance over R*
         cincl = b/d_Rs # cos(incl)
+
+        # Precompute
         eccsw = eccn*np.sin(w)
         y2 = 0 # We define y2 to avoid an error in the prange
 
