@@ -10,6 +10,10 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
 
     sol = np.zeros(18) # Single planet model has up-to 18-model parameters
 
+    ### Handle special cases
+    if gbls_ans.depth < 0:
+        gbls_ans.depth = 0
+
     # Set the initial guess using the bls answers.
     # ld coeff and rho are temporary values
 
@@ -31,6 +35,10 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
     sol[15] = 0.0  # thermal eclipse depth (ppm)
     sol[16] = 0.0  # Ellipsodial variations (ppm)
     sol[17] = 0.0  # Albedo amplitude (ppm)
+
+    # Sometimes t0 is negative and crashes the fit
+    if gbls_ans.epo < 0:
+        sol[8] += gbls_ans.bper
 
     return fitTransitModel(sol, id_to_fit, time, flux, ferror, itime)
 

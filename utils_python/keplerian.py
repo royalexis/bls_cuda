@@ -53,4 +53,4 @@ def transitDuration(sol):
     temp1 = (1 + Rp_Rs)**2 - b*b
     temp2 = 1 - (b/a_Rs)**2
 
-    return P/np.pi * np.arcsin(1/a_Rs * np.sqrt(temp1/temp2))
+    return P/np.pi * np.arcsin(min(1/a_Rs * np.sqrt(temp1/temp2), 1))

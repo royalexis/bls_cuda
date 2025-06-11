@@ -14,11 +14,11 @@ def plotTransit(time, flux, sol, itime, nintg=41):
     y_model = transitModel(sol, time, itime, nintg)
 
     tdur = transitDuration(sol)*24
-    if tdur < 0.01:
+    if tdur < 0.01 or np.isnan(tdur):
         tdur = 2
 
     # Fold the time array and sort it
-    phase = (time/per - np.floor(time/per) - t0/per)*per*24
+    phase = (time - per*np.floor(time/per) - t0 + per*np.floor(t0/per))*24
     i_sort = np.argsort(phase)
     phase_sorted = phase[i_sort]
     model_sorted = y_model[i_sort]
@@ -27,6 +27,9 @@ def plotTransit(time, flux, sol, itime, nintg=41):
 
     # Find bounds of plot
     i1, i2 = np.searchsorted(phase_sorted, (-tdur, tdur))
+    if i1 == i2:
+        i1 = 0
+        i2 = len(model_sorted)
     ymin = min(model_sorted[i1:i2])
     ymax = max(model_sorted[i1:i2])
     y1 = ymin - 0.1*(ymax-ymin) - 2.0*stdev
