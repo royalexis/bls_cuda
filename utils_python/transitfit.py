@@ -12,7 +12,7 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
 
     ### Handle special cases
     if gbls_ans.depth < 0:
-        gbls_ans.depth = 0
+        gbls_ans.depth = 1e-10
 
     # Set the initial guess using the bls answers.
     # ld coeff and rho are temporary values
@@ -49,8 +49,9 @@ def createBounds(time, id_to_fit):
     min_t = min(time)
     max_t = max(time)
 
-    lower_bound = np.array([1e-4, 0, -1, 0, 0, 0, -np.inf, -np.inf, min_t, min_t, 0, 0, -1, -1, -np.inf, -np.inf, -np.inf, -np.inf])
-    upper_bound = np.array([1e3, 2, 1, 1, 1, 1, np.inf, np.inf, max_t, max_t, 2, 1, 1, 1, np.inf, np.inf, np.inf, np.inf])
+    # Rho and Rp/Rs are in log space
+    lower_bound = np.array([np.log(1e-4), 0, -1, 0, 0, 0, -np.inf, -np.inf, min_t, min_t, 0, -np.inf, -1, -1, -np.inf, -np.inf, -np.inf, -np.inf])
+    upper_bound = np.array([np.log(1e3), 2, 1, 1, 1, 1, np.inf, np.inf, max_t, max_t, 2, 0, 1, 1, np.inf, np.inf, np.inf, np.inf])
 
     return (lower_bound[id_to_fit], upper_bound[id_to_fit])
 
@@ -63,16 +64,26 @@ def fitTransitModel(sol, id_to_fit, time, flux, ferror, itime):
     sol_full = np.copy(sol) # Copy the initial guess
     def wrapperTransit(sol_free, time, flux, ferror, itime):
         for i, ind in enumerate(id_to_fit):
-            sol_full[ind] = sol_free[i]
+            if ind in [0, 11]:
+                sol_full[ind] = np.exp(sol_free[i])
+            else:
+                sol_full[ind] = sol_free[i]
         return transitToOptimize(sol_full, time, flux, ferror, itime)
     
     bounds = createBounds(time, id_to_fit)
+
+    # Take the log of log space parameters
+    sol[0] = np.log(sol[0])
+    sol[11] = np.log(sol[11])
 
     res = least_squares(wrapperTransit, sol[id_to_fit], bounds=bounds, args=(time, flux, ferror, itime))
 
     # Recreate the full solution with the result
     for i, ind in enumerate(id_to_fit):
-        sol_full[ind] = res.x[i]
+        if ind in [0, 11]:
+            sol_full[ind] = np.exp(res.x[i])
+        else:
+            sol_full[ind] = res.x[i]
 
     return sol_full
 
