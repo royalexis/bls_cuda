@@ -10,10 +10,6 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
 
     sol = np.zeros(18) # Single planet model has up-to 18-model parameters
 
-    ### Handle special cases
-    if gbls_ans.depth < 0:
-        gbls_ans.depth = 1e-10
-
     # Set the initial guess using the bls answers.
     # ld coeff and rho are temporary values
 
@@ -28,7 +24,10 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
     sol[8]  = gbls_ans.epo             # Center of transit time (days)
     sol[9]  = gbls_ans.bper            # Orbital Period (days)
     sol[10] = 0.5                      # Impact parameter
-    sol[11] = np.sqrt(gbls_ans.depth)  # Rp/R*
+    if gbls_ans.depth < 0:             # Rp/R*
+        sol[11] = 1e-5  
+    else:
+        sol[11] = np.sqrt(gbls_ans.depth)
     sol[12] = 0.0  # sqrt(e)cos(w)
     sol[13] = 0.0  # sqrt(e)sin(w)
     sol[14] = 0.0  # RV amplitude (m/s)
