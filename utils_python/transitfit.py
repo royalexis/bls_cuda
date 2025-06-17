@@ -5,6 +5,15 @@ import transitPy5 as tpy5
 import bls_cpu as gbls
 
 def analyseLightCurve(fileLoc, gbls_inputs):
+    """
+    Function to call to analyse a light curve and get the best-fit parameters
+
+    fileLoc: Location of string
+    gbls_inputs: Inputs of the bls
+
+    Returns: phot object, best-fit parameters returned by fit, answers from BLS
+    """
+
     # Read data
     phot = tpy5.readphot(fileLoc)
     
@@ -19,7 +28,13 @@ def analyseLightCurve(fileLoc, gbls_inputs):
 
 def fitFromBLS(gbls_ans, time, flux, ferror, itime):
     """
-    Fits a transit model using the answers from the bls algorithm
+    Fits a transit model using the answers from the bls.
+
+    gbls_ans: Answers from the bls
+    time, flux, ferror: Data arrays
+    itime: Integration time array
+
+    return: Array containing the best-fit parameters for the transit model
     """
     id_to_fit = np.array([0, 7, 8, 9, 10, 11]) # We fit only: rho, zpt, t0, Per, b, Rp/Rs
 
@@ -59,6 +74,9 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
 def createBounds(time, id_to_fit):
     """
     Creates the bounds for the parameters
+
+    time: time array
+    id_to_fit: Array containing the indices of the parameters to fit
     """
     min_t = min(time)
     max_t = max(time)
@@ -72,6 +90,13 @@ def createBounds(time, id_to_fit):
 def fitTransitModel(sol, id_to_fit, time, flux, ferror, itime):
     """
     Function to call for fitting
+
+    sol: Array of initial parameters for fitting
+    id_to_fit: Array containing the indices of the parameters to fit
+    time, flux, ferror: Data arrays
+    itime: Integration time array
+
+    return: Array containing the best-fit parameters for the transit model
     """
 
     # Fit only the parameters in id_to_fit
@@ -103,7 +128,11 @@ def fitTransitModel(sol, id_to_fit, time, flux, ferror, itime):
 
 def transitToOptimize(sol, time, flux, ferror, itime):
     """
-    Handles constraints and returns the vector of differences
+    Handles constraints and returns the vector of differences. You shouldn't have to call this function
+
+    sol: Array of transit model parameters for fitting
+    time, flux, ferror: Data arrays
+    itime: Integration time array
     """
     n = len(time)
 

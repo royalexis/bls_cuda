@@ -6,7 +6,12 @@ from utils_python.keplerian import transitDuration
 
 def plotTransit(time, flux, sol, itime, nintg=41):
     """
-    Plot a transit model. Assuming time is in days. Set flux=0 for no scatterplot
+    Plots a transit model. Assuming time is in days. Set flux=0 for no scatterplot
+
+    time, flux: Data arrays
+    sol: Array containing the transit model parameters to plot
+    itime: Integration time array
+    nintg: Number of points inside the integration time
     """
     t0 = sol[8]
     per = sol[9]
@@ -52,6 +57,9 @@ def printParams(sol, ind_to_print=[]):
     """
     Prints the parameters in a nice way.
     You can select the indices to print using a list or array.
+
+    sol: Array containing the parameters to print
+    ind_to_print: List containing the indices of the parameters to print. Leave empty to print all
     """
 
     paramsDict = {

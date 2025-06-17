@@ -11,7 +11,14 @@ Cs = 2.99792458e8
 @njit(parallel=True, cache=True)
 def transitModel(sol, time, itime, nintg=41):
     """
-    Transit Model
+    Computes a Transit Model.
+
+    sol: Array containing all the parameters. To view the list of params, see printParams() from transitplot.py
+    time: Time array
+    itime: Integration time array. Has to be the same length as time
+    nintg: Number of points inside the integration time
+
+    return: Array containing the flux values. Same length as the time array
     """
 
     # Reading parameters
