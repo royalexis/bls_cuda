@@ -1,6 +1,21 @@
 import numpy as np
 from scipy.optimize import least_squares
 from utils_python.transitmodel import transitModel
+import transitPy5 as tpy5
+import bls_cpu as gbls
+
+def analyseLightCurve(fileLoc, gbls_inputs):
+    # Read data
+    phot = tpy5.readphot(fileLoc)
+    
+    # Apply BLS
+    gbls_inputs.zerotime = min(phot.time)
+    gbls_ans = gbls.bls(gbls_inputs, phot.time[phot.icut == 0], phot.flux[phot.icut == 0])
+    
+    # Fit using BLS answers
+    sol_fit = fitFromBLS(gbls_ans, phot.time - gbls_inputs.zerotime, phot.flux + 1, phot.ferr, phot.itime)
+
+    return phot, sol_fit, gbls_ans
 
 def fitFromBLS(gbls_ans, time, flux, ferror, itime):
     """
