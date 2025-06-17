@@ -610,7 +610,7 @@ def readphot(filename):
             if len(columns) >= 3:
                 phot.ferr.append(float(columns[2]))
             if len(columns) >= 4:
-                phot.itime.append(float(columns[2]))
+                phot.itime.append(float(columns[3]))
         i+=1
     f.close()
     

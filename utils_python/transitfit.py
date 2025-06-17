@@ -4,7 +4,7 @@ from utils_python.transitmodel import transitModel
 import transitPy5 as tpy5
 import bls_cpu as gbls
 
-def analyseLightCurve(fileLoc, gbls_inputs):
+def analyseLightCurve(gbls_inputs):
     """
     Function to call to analyse a light curve and get the best-fit parameters
 
@@ -15,7 +15,7 @@ def analyseLightCurve(fileLoc, gbls_inputs):
     """
 
     # Read data
-    phot = tpy5.readphot(fileLoc)
+    phot = tpy5.readphot(gbls_inputs.lcdir + gbls_inputs.filename)
     
     # Apply BLS
     gbls_inputs.zerotime = min(phot.time)
