@@ -36,24 +36,24 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
 
     return: Array containing the best-fit parameters for the transit model, Error on parameters
     """
-    id_to_fit = [0, 7, 8, 9, 10, 11] # We fit only: rho, zpt, t0, Per, b, Rp/Rs
+    params_to_fit = ["rho", "zpt", "t0", "per", "bb", "rdr"] # We fit only: rho, zpt, t0, Per, b, Rp/Rs
 
     sol = transitm.transit_model_class() # Single planet model has up-to 18-model parameters
 
     # Set the initial guess using the bls answers.
     # ld coeff and rho are temporary values
 
-    sol.rho  = 0.6  
-    sol.nl1  = 0.0  
-    sol.nl2  = 0.0  
-    sol.nl3  = 0.6  
-    sol.nl4  = 0.4
-    sol.dil  = 0.0
-    sol.vof  = 0.0
-    sol.zpt  = 0.0
-    sol.t0   = [gbls_ans.epo]
-    sol.per  = [gbls_ans.bper]
-    sol.bb   = [0.5]
+    sol.rho = 0.6  
+    sol.nl1 = 0.0  
+    sol.nl2 = 0.0  
+    sol.nl3 = 0.6  
+    sol.nl4 = 0.4
+    sol.dil = 0.0
+    sol.vof = 0.0
+    sol.zpt = np.mean(flux)
+    sol.t0  = [gbls_ans.epo]
+    sol.per = [gbls_ans.bper]
+    sol.bb  = [0.5]
     if gbls_ans.depth < 0:
         sol.rdr = [1e-5]  
     else:
@@ -69,7 +69,7 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
     if gbls_ans.epo < 0:
         sol.t0[0] += gbls_ans.bper
 
-    return fitTransitModel(sol, id_to_fit, time, flux, ferror, itime)
+    return fitTransitModel(sol, params_to_fit, time, flux, ferror, itime)
 
 def createBounds(time, id_to_fit):
     """
@@ -87,12 +87,12 @@ def createBounds(time, id_to_fit):
 
     return (lower_bound[id_to_fit], upper_bound[id_to_fit])
 
-def fitTransitModel(sol_obj, id_to_fit, time, flux, ferror, itime):
+def fitTransitModel(sol_obj, params_to_fit, time, flux, ferror, itime):
     """
     Function to call for fitting
 
     sol: Transit model object with initial parameters
-    id_to_fit: Array containing the indices of the parameters to fit
+    params_to_fit: Array containing the names of the parameters to fit according to the tm class
     time, flux, ferror: Data arrays
     itime: Integration time array
 
@@ -100,15 +100,16 @@ def fitTransitModel(sol_obj, id_to_fit, time, flux, ferror, itime):
             These arrays are the same size as sol, with the fixed parameters untouched.
     """
 
-    log_space_params = [0, 11] # Rho and Rp/Rs are in log space
-
     # Transform solution object to array
     sol = sol_obj.to_array()
+
+    log_space_params = [transitm.var_to_ind["rho"], transitm.var_to_ind["rdr"]] # Rho and Rp/Rs are in log space
+    id_to_fit = [transitm.var_to_ind[param] for param in params_to_fit]
 
     # Fit only the parameters in id_to_fit
     sol_full = np.copy(sol) # Copy the initial guess
     def wrapperTransit(sol_free, time, flux, ferror, itime):
-        """ Wrapper function that takes only the free parameters """
+        """ Wrapper function that takes only the free parameters as arguments """
         for i, ind in enumerate(id_to_fit):
             if ind in log_space_params:
                 sol_full[ind] = np.exp(sol_free[i])

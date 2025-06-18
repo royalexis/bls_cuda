@@ -8,6 +8,13 @@ from numba import njit, prange
 G = 6.674e-11
 Cs = 2.99792458e8
 
+# Dictionnary relating the params to indices of an array
+var_to_ind = {
+    "rho": 0, "nl1": 1, "nl2": 2, "nl3": 3, "nl4": 4, "dil": 5,
+    "vof": 6, "zpt": 7, "t0": 8, "per": 9, "bb": 10, "rdr": 11,
+    "ecw": 12, "esw": 13, "krv": 14, "ted": 15, "ell": 16, "alb": 17
+}
+
 class transit_model_class:
     """
     Class containing all the transit model parameters
@@ -38,6 +45,10 @@ class transit_model_class:
         """
         Load errors from 1D array. Array has to have a length of (8+10*n) where n is the nb of planets
         """
+        if (len(err_arr) - 8) % 10 != 0:
+            print("Error array doesn't have the right length")
+            return
+
         self.npl = (len(err_arr) - 8) // 10
 
         self.drho, self.dnl1, self.dnl2, self.dnl3, self.dnl4, self.ddil, self.dvof, self.dzpt = err_arr[:8]
@@ -61,6 +72,10 @@ class transit_model_class:
         """
         Load object from 1D array. Array has to have a length of (8+10*n) where n is the nb of planets
         """
+        if (len(sol) - 8) % 10 != 0:
+            print("Parameters array doesn't have the right length")
+            return
+
         self.npl = (len(sol) - 8) // 10
 
         self.rho, self.nl1, self.nl2, self.nl3, self.nl4, self.dil, self.vof, self.zpt = sol[:8]
