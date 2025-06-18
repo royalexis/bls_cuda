@@ -53,46 +53,55 @@ def plotTransit(time, flux, sol, itime, nintg=41):
     plt.axis((-1.5*tdur, 1.5*tdur, y1, y2))
     plt.show()
 
-def printParams(sol, sol_err, ind_to_print=[]):
+def printParams(sol):
     """
     Prints the parameters in a nice way.
     You can select the indices to print using a list or array.
 
-    sol: Array containing the parameters to print
-    sol_err: Array containing the errors on parameters
-    ind_to_print: List containing the indices of the parameters to print. Leave empty to print all
+    sol: Transit model object containing the parameters to print
     """
 
     paramsDict = {
-        "ρ (g/cm³)": 0, "c1": 1, "c2": 2, "q1": 3, "q2": 4,
-        "Dilution": 5, "Velocity Offset": 6, "Photometric zero point": 7,
-        "t0 (days)": 8, "Period (days)": 9, "Impact parameter": 10, "Rp/R*": 11,
-        "sqrt(e)cos(w)": 12, "sqrt(e)sin(w)": 13, "RV Amplitude (m/s)": 14,
-        "Thermal eclipse depth (ppm)": 15, "Ellipsoidal variations (ppm)": 16, "Albedo amplitude (ppm)": 17
+        "ρ (g/cm³)": "rho", "c1": "nl1", "c2": "nl2", "q1": "nl3", "q2": "nl4",
+        "Dilution": "dil", "Velocity Offset": "vof", "Photometric zero point": "zpt",
+        "t0 (days)": "t0", "Period (days)": "per", "Impact parameter": "bb", "Rp/R*": "rdr",
+        "sqrt(e)cos(w)": "ecw", "sqrt(e)sin(w)": "esw", "RV Amplitude (m/s)": "krv",
+        "Thermal eclipse depth (ppm)": "ted", "Ellipsoidal variations (ppm)": "ell", "Albedo amplitude (ppm)": "alb"
     }
 
-    # Select only certain keys if specified
-    if len(ind_to_print) != 0:
-        dictToPrint = {}
-        for i, key in enumerate(paramsDict):
-            if i in ind_to_print:
-                dictToPrint[key] = paramsDict[key]
-    else:
-        dictToPrint = paramsDict
-
     # Print every value in the dictionary
-    for key in dictToPrint:
-        ind = paramsDict[key]
-        val = sol[ind]
-        err = sol_err[ind]
-        if val != 0:
-            exponent = np.floor(np.log10(abs(val)))
-        else:
-            exponent = 1
+    for i, key in enumerate(paramsDict):
+        var_name = paramsDict[key]
+        val = getattr(sol, var_name)
+        err = getattr(sol, "d" + var_name)
 
-        if abs(exponent) > 2:
-            print(f"{key + ':':<30} {val:>10.3e} ± {err:.3e}")
-        elif len(str(val)) > 7:
-            print(f"{key + ':':<30} {val:>10.7f} ± {err:.7f}")
+        # Stellar params
+        if i < 8:
+            if val != 0:
+                exponent = np.floor(np.log10(abs(val)))
+            else:
+                exponent = 1
+
+            if abs(exponent) > 2:
+                print(f"{key + ':':<30} {val:>10.3e} ± {err:.3e}")
+            elif len(str(val)) > 7:
+                print(f"{key + ':':<30} {val:>10.7f} ± {err:.7f}")
+            else:
+                print(f"{key + ':':<30} {val:>10} ± {err}")
+
+        # Planet params
         else:
-            print(f"{key + ':':<30} {val:>10} ± {err}")
+            for j in range(sol.npl):
+                p_val = val[j]
+                p_err = err[j]
+                if p_val != 0:
+                    exponent = np.floor(np.log10(abs(p_val)))
+                else:
+                    exponent = 1
+
+                if abs(exponent) > 2:
+                    print(f"{key + ':':<30} {p_val:>10.3e} ± {p_err:.3e}")
+                elif len(str(p_val)) > 7:
+                    print(f"{key + ':':<30} {p_val:>10.7f} ± {p_err:.7f}")
+                else:
+                    print(f"{key + ':':<30} {p_val:>10} ± {p_err}")

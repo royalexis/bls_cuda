@@ -43,31 +43,31 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
     # Set the initial guess using the bls answers.
     # ld coeff and rho are temporary values
 
-    sol.rho  = 0.6  # Mean stellar density (g/cm^3)
-    sol.nl1  = 0.0  # Only used for non-linear limb-darkening
-    sol.nl2  = 0.0  # Only used for non-linear limb-darkening
-    sol.nl3  = 0.6  # q1 (limb-darkening)
-    sol.nl4  = 0.4  # q2 (limb-darkening)
-    sol.dil  = 0.0  # dilution
-    sol.vof  = 0.0  # Velocity offset
-    sol.zpt  = 0.0  # Photometric zero point
-    sol.t0  = gbls_ans.epo             # Center of transit time (days)
-    sol.per  = gbls_ans.bper           # Orbital Period (days)
-    sol.bb = 0.5                       # Impact parameter
-    if gbls_ans.depth < 0:             # Rp/R*
-        sol.rdr = 1e-5  
+    sol.rho  = 0.6  
+    sol.nl1  = 0.0  
+    sol.nl2  = 0.0  
+    sol.nl3  = 0.6  
+    sol.nl4  = 0.4
+    sol.dil  = 0.0
+    sol.vof  = 0.0
+    sol.zpt  = 0.0
+    sol.t0   = [gbls_ans.epo]
+    sol.per  = [gbls_ans.bper]
+    sol.bb   = [0.5]
+    if gbls_ans.depth < 0:
+        sol.rdr = [1e-5]  
     else:
-        sol.rdr = np.sqrt(gbls_ans.depth)
-    sol.ecw = 0.0  # sqrt(e)cos(w)
-    sol.esw = 0.0  # sqrt(e)sin(w)
-    sol.krv = 0.0  # RV amplitude (m/s)
-    sol.ted = 0.0  # thermal eclipse depth (ppm)
-    sol.ell = 0.0  # Ellipsodial variations (ppm)
-    sol.alb = 0.0  # Albedo amplitude (ppm)
+        sol.rdr = [np.sqrt(gbls_ans.depth)]
+    sol.ecw = [0.0]
+    sol.esw = [0.0]
+    sol.krv = [0.0]
+    sol.ted = [0.0]
+    sol.ell = [0.0]
+    sol.alb = [0.0]
 
     # Sometimes t0 is negative and crashes the fit
     if gbls_ans.epo < 0:
-        sol.t0 += gbls_ans.bper
+        sol.t0[0] += gbls_ans.bper
 
     return fitTransitModel(sol, id_to_fit, time, flux, ferror, itime)
 
@@ -139,10 +139,11 @@ def fitTransitModel(sol_obj, id_to_fit, time, flux, ferror, itime):
             err_full[ind] = fit_error[i]
 
     # Return to the transitmodel object
-    best_fit = transitm.transit_model_class()
-    best_fit.from_array(sol_full)
+    fit_params = transitm.transit_model_class()
+    fit_params.from_array(sol_full)
+    fit_params.load_errors(err_full)
 
-    return best_fit, err_full
+    return fit_params
 
 def transitToOptimize(sol, time, flux, ferror, itime):
     """

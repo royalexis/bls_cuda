@@ -14,25 +14,48 @@ class transit_model_class:
     """
     def __init__(self):
 
-        self.rho = 1.0
-        self.nl1 = 0.0
-        self.nl2 = 0.0
-        self.nl3 = 0.3
-        self.nl4 = 0.4
-        self.dil = 0.0
-        self.vof = 0.0
-        self.zpt = 0.0
-        self.npl = 1
-        self.t0  = [0.0]
-        self.per = [1.0]
-        self.bb  = [0.5]
-        self.rdr = [0.1]
-        self.ecw = [0.0]
-        self.esw = [0.0]
-        self.krv = [0.0]
-        self.ted = [0.0]
-        self.ell = [0.0]
-        self.alb = [0.0]
+        self.rho = 1.0      # Mean stellar density (g/cm^3)
+        self.nl1 = 0.0      # LDC - Only used for non-linear limb-darkening
+        self.nl2 = 0.0      # LDC - Only used for non-linear limb-darkening
+        self.nl3 = 0.3      # LDC - q1
+        self.nl4 = 0.4      # LDC - q2
+        self.dil = 0.0      # Dilution
+        self.vof = 0.0      # Velocity offset
+        self.zpt = 0.0      # Photometric zero point
+        self.npl = 1        # Number of planets
+        self.t0  = [0.0]    # Center of transit time (days)
+        self.per = [1.0]    # Orbital period (days)
+        self.bb  = [0.5]    # Impact parameter
+        self.rdr = [0.1]    # Rp/R*
+        self.ecw = [0.0]    # sqrt(e)cos(w)
+        self.esw = [0.0]    # sqrt(e)sin(w)
+        self.krv = [0.0]    # RV amplitude (m/s)
+        self.ted = [0.0]    # Thermal eclipse depth (ppm)
+        self.ell = [0.0]    # Ellipsodial variations (ppm)
+        self.alb = [0.0]    # Albedo amplitude (ppm)
+    
+    def load_errors(self, err_arr):
+        """
+        Load errors from 1D array. Array has to have a length of (8+10*n) where n is the nb of planets
+        """
+        self.npl = (len(err_arr) - 8) // 10
+
+        self.drho, self.dnl1, self.dnl2, self.dnl3, self.dnl4, self.ddil, self.dvof, self.dzpt = err_arr[:8]
+
+        self.dt0, self.dper, self.dbb, self.drdr, self.decw, self.desw, \
+                    self.dkrv, self.dted, self.dell, self.dalb = ([None]*self.npl for i in range(10))
+
+        for i in range(self.npl):
+            self.dt0[i] = err_arr[10*i + 8 + 0]
+            self.dper[i] = err_arr[10*i + 8 + 1]
+            self.dbb[i] = err_arr[10*i + 8 + 2]
+            self.drdr[i] = err_arr[10*i + 8 + 3]
+            self.decw[i] = err_arr[10*i + 8 + 4]
+            self.desw[i] = err_arr[10*i + 8 + 5]
+            self.dkrv[i] = err_arr[10*i + 8 + 6]
+            self.dted[i] = err_arr[10*i + 8 + 7]
+            self.dell[i] = err_arr[10*i + 8 + 8]
+            self.dalb[i] = err_arr[10*i + 8 + 9]
 
     def from_array(self, sol):
         """
