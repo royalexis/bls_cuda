@@ -53,21 +53,22 @@ def plotTransit(time, flux, sol, itime, nintg=41):
     plt.axis((-1.5*tdur, 1.5*tdur, y1, y2))
     plt.show()
 
-def printParams(sol, ind_to_print=[]):
+def printParams(sol, sol_err, ind_to_print=[]):
     """
     Prints the parameters in a nice way.
     You can select the indices to print using a list or array.
 
     sol: Array containing the parameters to print
+    sol_err: Array containing the errors on parameters
     ind_to_print: List containing the indices of the parameters to print. Leave empty to print all
     """
 
     paramsDict = {
-        "ρ (g/cm³)": sol[0], "c1": sol[1], "c2": sol[2], "q1": sol[3], "q2": sol[4],
-        "Dilution": sol[5], "Velocity Offset": sol[6], "Photometric zero point": sol[7],
-        "t0 (days)": sol[8], "Period (days)": sol[9], "Impact parameter": sol[10], "Rp/R*": sol[11],
-        "sqrt(e)cos(w)": sol[12], "sqrt(e)sin(w)": sol[13], "RV Amplitude (m/s)": sol[14],
-        "Thermal eclipse depth (ppm)": sol[15], "Ellipsoidal variations (ppm)": sol[16], "Albedo amplitude (ppm)": sol[17]
+        "ρ (g/cm³)": 0, "c1": 1, "c2": 2, "q1": 3, "q2": 4,
+        "Dilution": 5, "Velocity Offset": 6, "Photometric zero point": 7,
+        "t0 (days)": 8, "Period (days)": 9, "Impact parameter": 10, "Rp/R*": 11,
+        "sqrt(e)cos(w)": 12, "sqrt(e)sin(w)": 13, "RV Amplitude (m/s)": 14,
+        "Thermal eclipse depth (ppm)": 15, "Ellipsoidal variations (ppm)": 16, "Albedo amplitude (ppm)": 17
     }
 
     # Select only certain keys if specified
@@ -81,15 +82,17 @@ def printParams(sol, ind_to_print=[]):
 
     # Print every value in the dictionary
     for key in dictToPrint:
-        val = paramsDict[key]
+        ind = paramsDict[key]
+        val = sol[ind]
+        err = sol_err[ind]
         if val != 0:
             exponent = np.floor(np.log10(abs(val)))
         else:
             exponent = 1
 
         if abs(exponent) > 2:
-            print(f"{key + ':':<30} {val:>10.3e}")
+            print(f"{key + ':':<30} {val:>10.3e} ± {err:.3e}")
         elif len(str(val)) > 7:
-            print(f"{key + ':':<30} {val:>10.7f}")
+            print(f"{key + ':':<30} {val:>10.7f} ± {err:.7f}")
         else:
-            print(f"{key + ':':<30} {val:>10}")
+            print(f"{key + ':':<30} {val:>10} ± {err}")

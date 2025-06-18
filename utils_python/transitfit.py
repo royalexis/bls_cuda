@@ -11,7 +11,7 @@ def analyseLightCurve(gbls_inputs):
     fileLoc: Location of string
     gbls_inputs: Inputs of the bls
 
-    Returns: phot object, best-fit parameters returned by fit, answers from BLS
+    Returns: phot object, best-fit parameters returned by fit, error on params, answers from BLS
     """
 
     # Read data
@@ -22,9 +22,9 @@ def analyseLightCurve(gbls_inputs):
     gbls_ans = gbls.bls(gbls_inputs, phot.time[phot.icut == 0], phot.flux[phot.icut == 0])
     
     # Fit using BLS answers
-    sol_fit = fitFromBLS(gbls_ans, phot.time - gbls_inputs.zerotime, phot.flux + 1, phot.ferr, phot.itime)
+    sol_fit, err_fit = fitFromBLS(gbls_ans, phot.time - gbls_inputs.zerotime, phot.flux + 1, phot.ferr, phot.itime)
 
-    return phot, sol_fit, gbls_ans
+    return phot, sol_fit, err_fit, gbls_ans
 
 def fitFromBLS(gbls_ans, time, flux, ferror, itime):
     """
@@ -34,7 +34,7 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
     time, flux, ferror: Data arrays
     itime: Integration time array
 
-    return: Array containing the best-fit parameters for the transit model
+    return: Array containing the best-fit parameters for the transit model, Error on parameters
     """
     id_to_fit = np.array([0, 7, 8, 9, 10, 11]) # We fit only: rho, zpt, t0, Per, b, Rp/Rs
 
@@ -96,14 +96,17 @@ def fitTransitModel(sol, id_to_fit, time, flux, ferror, itime):
     time, flux, ferror: Data arrays
     itime: Integration time array
 
-    return: Array containing the best-fit parameters for the transit model
+    return: Array containing the best-fit parameters for the transit model, Error on parameters
+            These arrays are the same size as sol, with the fixed parameters untouched.
     """
+
+    log_space_params = [0, 11] # Rho and Rp/Rs are in log space
 
     # Fit only the parameters in id_to_fit
     sol_full = np.copy(sol) # Copy the initial guess
     def wrapperTransit(sol_free, time, flux, ferror, itime):
         for i, ind in enumerate(id_to_fit):
-            if ind in [0, 11]:
+            if ind in log_space_params:
                 sol_full[ind] = np.exp(sol_free[i])
             else:
                 sol_full[ind] = sol_free[i]
@@ -112,19 +115,26 @@ def fitTransitModel(sol, id_to_fit, time, flux, ferror, itime):
     bounds = createBounds(time, id_to_fit)
 
     # Take the log of log space parameters
-    sol[0] = np.log(sol[0])
-    sol[11] = np.log(sol[11])
+    for i in log_space_params:
+        sol[i] = np.log(sol[i])
 
     res = least_squares(wrapperTransit, sol[id_to_fit], bounds=bounds, args=(time, flux, ferror, itime))
 
-    # Recreate the full solution with the result
-    for i, ind in enumerate(id_to_fit):
-        if ind in [0, 11]:
-            sol_full[ind] = np.exp(res.x[i])
-        else:
-            sol_full[ind] = res.x[i]
+    # Calculate error
+    is_weighted = True
+    fit_params, fit_error, fit_covar = calculate_parameter_errors(res, is_weighted)
 
-    return sol_full
+    # Recreate the full solution with the result
+    err_full = np.zeros(len(sol_full))
+    for i, ind in enumerate(id_to_fit):
+        if ind in log_space_params:
+            sol_full[ind] = np.exp(fit_params[i])
+            err_full[ind] = np.exp(fit_params[i]) * fit_error[i] # Error on f=exp(x) is exp(x)*error(x)
+        else:
+            sol_full[ind] = fit_params[i]
+            err_full[ind] = fit_error[i]
+
+    return sol_full, err_full
 
 def transitToOptimize(sol, time, flux, ferror, itime):
     """
@@ -161,3 +171,76 @@ def transitToOptimize(sol, time, flux, ferror, itime):
     y_model = transitModel(sol, time, itime=itime)
 
     return (y_model - flux)/ferror
+
+def calculate_parameter_errors(opt_result, residual_func_returns_weighted=True):
+    """
+    Calculates parameter errors (standard deviations) from scipy.optimize.least_squares results.
+
+    Args:
+        opt_result: The OptimizeResult object returned by least_squares.
+        residual_func_returns_weighted (bool): Set to True if your residual
+            function returns (data - model) / error. Set to False if it
+            returns (data - model). Defaults to True.
+
+    Returns:
+        tuple: (best_fit_params, param_errors, covariance_matrix)
+               param_errors and covariance_matrix might be None or contain NaNs
+               if calculation fails.
+    """
+    best_fit_params = opt_result.x
+    param_errors = None
+    covariance_matrix = None
+
+    if not opt_result.success:
+        print(f"Warning: Optimization failed or did not converge: {opt_result.message}")
+        return best_fit_params, np.full_like(best_fit_params, np.nan), None
+
+    jacobian = opt_result.jac
+    residuals = opt_result.fun # Residuals at the solution
+
+    if jacobian is None or not np.all(np.isfinite(jacobian)):
+         print("Warning: Jacobian is None or contains non-finite values. Cannot compute errors.")
+         return best_fit_params, np.full_like(best_fit_params, np.nan), None
+
+    N = len(residuals)
+    M = len(best_fit_params)
+
+    if N <= M:
+        print(f"Warning: Number of data points ({N}) <= number of parameters ({M}).")
+        print("Cannot reliably estimate errors or covariance.")
+        return best_fit_params, np.full_like(best_fit_params, np.nan), None
+
+    try:
+        jtj = jacobian.T @ jacobian
+
+        try:
+            covariance_matrix = np.linalg.inv(jtj)
+        except np.linalg.LinAlgError:
+            print("Warning: Jacobian transpose * Jacobian is singular or near-singular.")
+            print("Using pseudo-inverse. Parameter errors might be unreliable, check correlations.")
+            covariance_matrix = np.linalg.pinv(jtj)
+
+        if not residual_func_returns_weighted:
+            dof = N - M
+            mse = np.sum(residuals**2) / dof
+            covariance_matrix = covariance_matrix * mse
+
+        # --- Extract Errors ---
+        # Variances are the diagonal elements
+        # Ensure variances is a writeable copy using .copy()!
+        variances = np.diag(covariance_matrix).copy() # <--- FIX IS HERE
+
+        # Handle potential small negative values (now safe to modify)
+        variances[variances < 0] = 0
+
+        param_errors = np.sqrt(variances)
+
+    except (np.linalg.LinAlgError, ValueError, TypeError, ZeroDivisionError) as e: # Added ZeroDivisionError
+        print(f"Error calculating covariance/errors: {e}")
+        param_errors = np.full_like(best_fit_params, np.nan)
+        # Ensure covariance_matrix is None if errors couldn't be calculated,
+        # unless it was successfully calculated before the error occurred during variance extraction
+        if 'variances' not in locals(): # Check if error happened before variance calculation
+             covariance_matrix = None
+
+    return best_fit_params, param_errors, covariance_matrix
