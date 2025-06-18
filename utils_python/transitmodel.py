@@ -8,12 +8,76 @@ from numba import njit, prange
 G = 6.674e-11
 Cs = 2.99792458e8
 
+class transit_model_class:
+    """
+    Class containing all the transit model parameters
+    """
+    def __init__(self):
+
+        self.rho = 1.0
+        self.nl1 = 0.0
+        self.nl2 = 0.0
+        self.nl3 = 0.3
+        self.nl4 = 0.4
+        self.dil = 0.0
+        self.vof = 0.0
+        self.zpt = 0.0
+        self.npl = 1
+        self.t0  = [0.0]
+        self.per = [1.0]
+        self.bb  = [0.5]
+        self.rdr = [0.1]
+        self.ecw = [0.0]
+        self.esw = [0.0]
+        self.krv = [0.0]
+        self.ted = [0.0]
+        self.ell = [0.0]
+        self.alb = [0.0]
+
+    def from_array(self, sol):
+        """
+        Load object from 1D array. Array has to have a length of (8+10*n) where n is the nb of planets
+        """
+        self.npl = (len(sol) - 8) // 10
+
+        self.rho, self.nl1, self.nl2, self.nl3, self.nl4, self.dil, self.vof, self.zpt = sol[:8]
+
+        self.t0, self.per, self.bb, self.rdr, self.ecw, self.esw, \
+                    self.krv, self.ted, self.ell, self.alb = ([None]*self.npl for i in range(10))
+
+        for i in range(self.npl):
+            self.t0[i] = sol[10*i + 8 + 0]
+            self.per[i] = sol[10*i + 8 + 1]
+            self.bb[i] = sol[10*i + 8 + 2]
+            self.rdr[i] = sol[10*i + 8 + 3]
+            self.ecw[i] = sol[10*i + 8 + 4]
+            self.esw[i] = sol[10*i + 8 + 5]
+            self.krv[i] = sol[10*i + 8 + 6]
+            self.ted[i] = sol[10*i + 8 + 7]
+            self.ell[i] = sol[10*i + 8 + 8]
+            self.alb[i] = sol[10*i + 8 + 9]
+
+    def to_array(self):
+        """
+        Return a 1D array that transitModel() can read, since it is a numba function
+        """
+        len_array = 8 + self.npl*10
+        sol = np.zeros(len_array)
+
+        sol[:8] = self.rho, self.nl1, self.nl2, self.nl3, self.nl4, self.dil, self.vof, self.zpt
+
+        for i in range(self.npl):
+            sol[10*i + 8 : 10*i + 18] = self.t0[i], self.per[i], self.bb[i], self.rdr[i], self.ecw[i], self.esw[i], \
+                                        self.krv[i], self.ted[i], self.ell[i], self.alb[i]
+            
+        return sol
+
 @njit(parallel=True, cache=True)
 def transitModel(sol, time, itime, nintg=41):
     """
     Computes a Transit Model.
 
-    sol: Array containing all the parameters. To view the list of params, see printParams() from transitplot.py
+    sol: Array containing all the parameters. To view the list of params, see transit_model_class
     time: Time array
     itime: Integration time array. Has to be the same length as time
     nintg: Number of points inside the integration time
@@ -39,8 +103,7 @@ def transitModel(sol, time, itime, nintg=41):
     tmodel = np.zeros(nb_pts)
     dtype = np.zeros(nb_pts) # Photometry only
 
-    # Temporary
-    n_planet = 1
+    n_planet = (len(sol) - 8) // 10
 
     # Loop over every planet
     for ii in range(n_planet):

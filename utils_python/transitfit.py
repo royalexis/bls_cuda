@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.optimize import least_squares
-from utils_python.transitmodel import transitModel
+import utils_python.transitmodel as transitm
 import transitPy5 as tpy5
 import bls_cpu as gbls
 
@@ -36,38 +36,38 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
 
     return: Array containing the best-fit parameters for the transit model, Error on parameters
     """
-    id_to_fit = np.array([0, 7, 8, 9, 10, 11]) # We fit only: rho, zpt, t0, Per, b, Rp/Rs
+    id_to_fit = [0, 7, 8, 9, 10, 11] # We fit only: rho, zpt, t0, Per, b, Rp/Rs
 
-    sol = np.zeros(18) # Single planet model has up-to 18-model parameters
+    sol = transitm.transit_model_class() # Single planet model has up-to 18-model parameters
 
     # Set the initial guess using the bls answers.
     # ld coeff and rho are temporary values
 
-    sol[0]  = 0.6  # Mean stellar density (g/cm^3)
-    sol[1]  = 0.0  # Only used for non-linear limb-darkening
-    sol[2]  = 0.0  # Only used for non-linear limb-darkening
-    sol[3]  = 0.6  # q1 (limb-darkening)
-    sol[4]  = 0.4  # q2 (limb-darkening)
-    sol[5]  = 0.0  # dilution
-    sol[6]  = 0.0  # Velocity offset
-    sol[7]  = 0.0  # Photometric zero point
-    sol[8]  = gbls_ans.epo             # Center of transit time (days)
-    sol[9]  = gbls_ans.bper            # Orbital Period (days)
-    sol[10] = 0.5                      # Impact parameter
+    sol.rho  = 0.6  # Mean stellar density (g/cm^3)
+    sol.nl1  = 0.0  # Only used for non-linear limb-darkening
+    sol.nl2  = 0.0  # Only used for non-linear limb-darkening
+    sol.nl3  = 0.6  # q1 (limb-darkening)
+    sol.nl4  = 0.4  # q2 (limb-darkening)
+    sol.dil  = 0.0  # dilution
+    sol.vof  = 0.0  # Velocity offset
+    sol.zpt  = 0.0  # Photometric zero point
+    sol.t0  = gbls_ans.epo             # Center of transit time (days)
+    sol.per  = gbls_ans.bper           # Orbital Period (days)
+    sol.bb = 0.5                       # Impact parameter
     if gbls_ans.depth < 0:             # Rp/R*
-        sol[11] = 1e-5  
+        sol.rdr = 1e-5  
     else:
-        sol[11] = np.sqrt(gbls_ans.depth)
-    sol[12] = 0.0  # sqrt(e)cos(w)
-    sol[13] = 0.0  # sqrt(e)sin(w)
-    sol[14] = 0.0  # RV amplitude (m/s)
-    sol[15] = 0.0  # thermal eclipse depth (ppm)
-    sol[16] = 0.0  # Ellipsodial variations (ppm)
-    sol[17] = 0.0  # Albedo amplitude (ppm)
+        sol.rdr = np.sqrt(gbls_ans.depth)
+    sol.ecw = 0.0  # sqrt(e)cos(w)
+    sol.esw = 0.0  # sqrt(e)sin(w)
+    sol.krv = 0.0  # RV amplitude (m/s)
+    sol.ted = 0.0  # thermal eclipse depth (ppm)
+    sol.ell = 0.0  # Ellipsodial variations (ppm)
+    sol.alb = 0.0  # Albedo amplitude (ppm)
 
     # Sometimes t0 is negative and crashes the fit
     if gbls_ans.epo < 0:
-        sol[8] += gbls_ans.bper
+        sol.t0 += gbls_ans.bper
 
     return fitTransitModel(sol, id_to_fit, time, flux, ferror, itime)
 
@@ -87,11 +87,11 @@ def createBounds(time, id_to_fit):
 
     return (lower_bound[id_to_fit], upper_bound[id_to_fit])
 
-def fitTransitModel(sol, id_to_fit, time, flux, ferror, itime):
+def fitTransitModel(sol_obj, id_to_fit, time, flux, ferror, itime):
     """
     Function to call for fitting
 
-    sol: Array of initial parameters for fitting
+    sol: Transit model object with initial parameters
     id_to_fit: Array containing the indices of the parameters to fit
     time, flux, ferror: Data arrays
     itime: Integration time array
@@ -102,9 +102,13 @@ def fitTransitModel(sol, id_to_fit, time, flux, ferror, itime):
 
     log_space_params = [0, 11] # Rho and Rp/Rs are in log space
 
+    # Transform solution object to array
+    sol = sol_obj.to_array()
+
     # Fit only the parameters in id_to_fit
     sol_full = np.copy(sol) # Copy the initial guess
     def wrapperTransit(sol_free, time, flux, ferror, itime):
+        """ Wrapper function that takes only the free parameters """
         for i, ind in enumerate(id_to_fit):
             if ind in log_space_params:
                 sol_full[ind] = np.exp(sol_free[i])
@@ -134,7 +138,11 @@ def fitTransitModel(sol, id_to_fit, time, flux, ferror, itime):
             sol_full[ind] = fit_params[i]
             err_full[ind] = fit_error[i]
 
-    return sol_full, err_full
+    # Return to the transitmodel object
+    best_fit = transitm.transit_model_class()
+    best_fit.from_array(sol_full)
+
+    return best_fit, err_full
 
 def transitToOptimize(sol, time, flux, ferror, itime):
     """
@@ -168,7 +176,7 @@ def transitToOptimize(sol, time, flux, ferror, itime):
         if not (0 < c1 < 1) or not (0 < c2 < 1) or not (0 < c3 < 1) or not (0 < c4 < 1):
             return np.full(n, 1e20)
 
-    y_model = transitModel(sol, time, itime=itime)
+    y_model = transitm.transitModel(sol, time, itime=itime)
 
     return (y_model - flux)/ferror
 

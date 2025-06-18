@@ -9,14 +9,14 @@ def plotTransit(time, flux, sol, itime, nintg=41):
     Plots a transit model. Assuming time is in days. Set flux=0 for no scatterplot
 
     time, flux: Data arrays
-    sol: Array containing the transit model parameters to plot
+    sol: Transit model object with parameters
     itime: Integration time array
     nintg: Number of points inside the integration time
     """
-    t0 = sol[8]
-    per = sol[9]
+    t0 = sol.t0[0]
+    per = sol.per[0]
 
-    y_model = transitModel(sol, time, itime, nintg)
+    y_model = transitModel(sol.to_array(), time, itime, nintg)
 
     tdur = transitDuration(sol)*24
     if tdur < 0.01 or np.isnan(tdur):
