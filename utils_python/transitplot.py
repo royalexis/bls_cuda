@@ -4,15 +4,21 @@ import matplotlib as mpl
 from utils_python.transitmodel import transitModel
 from utils_python.keplerian import transitDuration
 
-def plotTransit(time, flux, sol, itime, nintg=41):
+def plotTransit(phot, sol, nintg=41):
     """
-    Plots a transit model. Assuming time is in days. Set flux=0 for no scatterplot
+    Plots a transit model. Assuming time is in days. Set flux=0 for no scatterplot.
+    If n_planet > 1, for now, it plots only the first one.
 
-    time, flux: Data arrays
+    phot: Phot object from reading data file
     sol: Transit model object with parameters
-    itime: Integration time array
     nintg: Number of points inside the integration time
     """
+
+    # Read phot class
+    time = phot.time - min(phot.time)
+    flux = phot.flux + 1
+    itime = phot.itime
+
     t0 = sol.t0[0]
     per = sol.per[0]
 
@@ -56,7 +62,6 @@ def plotTransit(time, flux, sol, itime, nintg=41):
 def printParams(sol):
     """
     Prints the parameters in a nice way.
-    You can select the indices to print using a list or array.
 
     sol: Transit model object containing the parameters to print
     """

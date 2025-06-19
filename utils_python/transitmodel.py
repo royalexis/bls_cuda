@@ -295,12 +295,12 @@ def transitModel(sol, time, itime, nintg=41):
                 tm = 1
                 pass # To do
 
-            tmodel[i] += tm # /n_planet ? To check
+            tmodel[i] += tm
     
     # Add zero point
     for i in range(nb_pts):
         if dtype[i] == 0:
-            tmodel[i] += zpt
+            tmodel[i] += zpt - (n_planet - 1) # If n_planet > 1, we need to bring down the model
         else:
             tmodel[i] += voff - 1
 

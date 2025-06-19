@@ -8,7 +8,6 @@ def analyseLightCurve(gbls_inputs):
     """
     Function to call to analyse a light curve and get the best-fit parameters
 
-    fileLoc: Location of string
     gbls_inputs: Inputs of the bls
 
     Returns: phot object, best-fit parameters returned by fit, error on params, answers from BLS
@@ -22,17 +21,16 @@ def analyseLightCurve(gbls_inputs):
     gbls_ans = gbls.bls(gbls_inputs, phot.time[phot.icut == 0], phot.flux[phot.icut == 0])
     
     # Fit using BLS answers
-    sol_fit, err_fit = fitFromBLS(gbls_ans, phot.time - gbls_inputs.zerotime, phot.flux + 1, phot.ferr, phot.itime)
+    sol_fit, err_fit = fitFromBLS(gbls_ans, phot)
 
     return phot, sol_fit, err_fit, gbls_ans
 
-def fitFromBLS(gbls_ans, time, flux, ferror, itime):
+def fitFromBLS(gbls_ans, phot):
     """
     Fits a transit model using the answers from the bls.
 
     gbls_ans: Answers from the bls
-    time, flux, ferror: Data arrays
-    itime: Integration time array
+    phot: Phot object from reading data file
 
     return: Array containing the best-fit parameters for the transit model, Error on parameters
     """
@@ -50,7 +48,7 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
     sol.nl4 = 0.4
     sol.dil = 0.0
     sol.vof = 0.0
-    sol.zpt = np.mean(flux)
+    sol.zpt = np.mean(phot.flux)
     sol.t0  = [gbls_ans.epo]
     sol.per = [gbls_ans.bper]
     sol.bb  = [0.5]
@@ -69,7 +67,7 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
     if gbls_ans.epo < 0:
         sol.t0[0] += gbls_ans.bper
 
-    return fitTransitModel(sol, params_to_fit, time, flux, ferror, itime)
+    return fitTransitModel(sol, params_to_fit, phot)
 
 def createBounds(time, id_to_fit):
     """
@@ -87,19 +85,24 @@ def createBounds(time, id_to_fit):
 
     return (lower_bound[id_to_fit], upper_bound[id_to_fit])
 
-def fitTransitModel(sol_obj, params_to_fit, time, flux, ferror, itime):
+def fitTransitModel(sol_obj, params_to_fit, phot):
     """
     Function to call for fitting
 
-    sol: Transit model object with initial parameters
-    params_to_fit: Array containing the names of the parameters to fit according to the tm class
-    time, flux, ferror: Data arrays
-    itime: Integration time array
+    sol_obj: Transit model object with initial parameters
+    params_to_fit: List containing strings of the names of the parameters to fit according to the tm class
+    phot: Phot object from reading data file
 
     return: Array containing the best-fit parameters for the transit model, Error on parameters
-            These arrays are the same size as sol, with the fixed parameters untouched.
+            These arrays are the same size as sol_obj, with the fixed parameters untouched.
     """
 
+    # Read phot class
+    time = phot.time - min(phot.time)
+    flux = phot.flux + 1
+    ferror = phot.ferr
+    itime = phot.itime
+    
     # Transform solution object to array
     sol = sol_obj.to_array()
 
