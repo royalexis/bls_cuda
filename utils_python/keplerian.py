@@ -36,16 +36,16 @@ def solve_kepler_eq(eccn, Manom, Eanom, thres=1e-6, itmax=100):
 
     return Eanom
 
-def transitDuration(sol):
+def transitDuration(sol, i_planet=0):
     """
     Calculates the transit duration
     """
     G = 6.674e-11
 
     density = sol.rho
-    P = sol.per[0]
-    b = sol.bb[0]
-    Rp_Rs = sol.rdr[0]
+    P = sol.per[i_planet]
+    b = sol.bb[i_planet]
+    Rp_Rs = sol.rdr[i_planet]
 
     a_Rs = 10 * np.cbrt(density * G * (P*86400)**2 / (3*np.pi))
 

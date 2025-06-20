@@ -26,7 +26,7 @@ def plotTransit(phot, sol, nintg=41, pl_to_plot=0):
     y_model = transitModel(sol.to_array(), time, itime, nintg) - zpt
     flux = flux - zpt # Remove the zero point to always plot around 1
 
-    tdur = transitDuration(sol)*24
+    tdur = transitDuration(sol, pl_to_plot)*24
     if tdur < 0.01 or np.isnan(tdur):
         tdur = 2
 
@@ -67,47 +67,54 @@ def printParams(sol):
     sol: Transit model object containing the parameters to print
     """
 
-    paramsDict = {
+    stellarDict = {
         "ρ (g/cm³)": "rho", "c1": "nl1", "c2": "nl2", "q1": "nl3", "q2": "nl4",
-        "Dilution": "dil", "Velocity Offset": "vof", "Photometric zero point": "zpt",
+        "Dilution": "dil", "Velocity Offset": "vof", "Photometric zero point": "zpt"
+    }
+
+    planetDict = {
         "t0 (days)": "t0", "Period (days)": "per", "Impact parameter": "bb", "Rp/R*": "rdr",
         "sqrt(e)cos(w)": "ecw", "sqrt(e)sin(w)": "esw", "RV Amplitude (m/s)": "krv",
         "Thermal eclipse depth (ppm)": "ted", "Ellipsoidal variations (ppm)": "ell", "Albedo amplitude (ppm)": "alb"
     }
 
-    # Print every value in the dictionary
-    for i, key in enumerate(paramsDict):
-        var_name = paramsDict[key]
+    # Stellar params
+    for key in stellarDict:
+        var_name = stellarDict[key]
         val = getattr(sol, var_name)
         err = getattr(sol, "d" + var_name)
 
-        # Stellar params
-        if i < 8:
-            if val != 0:
-                exponent = np.floor(np.log10(abs(val)))
+        if val != 0:
+            exponent = np.floor(np.log10(abs(val)))
+        else:
+            exponent = 1
+
+        if abs(exponent) > 2:
+            print(f"{key + ':':<30} {val:>10.3e} ± {err:.3e}")
+        elif len(str(val)) > 7:
+            print(f"{key + ':':<30} {val:>10.7f} ± {err:.7f}")
+        else:
+            print(f"{key + ':':<30} {val:>10} ± {err}")
+
+    # Planet params
+    for j in range(sol.npl):
+        if sol.npl > 1:
+            print(f"\nPlanet #{j + 1}:")
+        for key in planetDict:
+            var_name = planetDict[key]
+            val = getattr(sol, var_name)
+            err = getattr(sol, "d" + var_name)
+
+            p_val = val[j]
+            p_err = err[j]
+            if p_val != 0:
+                exponent = np.floor(np.log10(abs(p_val)))
             else:
                 exponent = 1
 
             if abs(exponent) > 2:
-                print(f"{key + ':':<30} {val:>10.3e} ± {err:.3e}")
-            elif len(str(val)) > 7:
-                print(f"{key + ':':<30} {val:>10.7f} ± {err:.7f}")
+                print(f"{key + ':':<30} {p_val:>10.3e} ± {p_err:.3e}")
+            elif len(str(p_val)) > 7:
+                print(f"{key + ':':<30} {p_val:>10.7f} ± {p_err:.7f}")
             else:
-                print(f"{key + ':':<30} {val:>10} ± {err}")
-
-        # Planet params
-        else:
-            for j in range(sol.npl):
-                p_val = val[j]
-                p_err = err[j]
-                if p_val != 0:
-                    exponent = np.floor(np.log10(abs(p_val)))
-                else:
-                    exponent = 1
-
-                if abs(exponent) > 2:
-                    print(f"{key + ':':<30} {p_val:>10.3e} ± {p_err:.3e}")
-                elif len(str(p_val)) > 7:
-                    print(f"{key + ':':<30} {p_val:>10.7f} ± {p_err:.7f}")
-                else:
-                    print(f"{key + ':':<30} {p_val:>10} ± {p_err}")
+                print(f"{key + ':':<30} {p_val:>10} ± {p_err}")

@@ -27,14 +27,13 @@ def analyseLightCurve(gbls_inputs):
 
     return phot, sol_fit, gbls_ans
 
-def fitFromBLS(gbls_ans, phot, koicat=None, idx=None):
+def fitFromBLS(gbls_ans, phot, M_H=None, Teff=None, logg=None):
     """
     Fits a transit model using the answers from the bls.
 
     gbls_ans: Answers from the bls
     phot: Phot object from reading data file
-    koicat: Catalogue class. Leave default to use arbitrary LDC
-    idx: Id of star in catalogue. Leave default to use arbitrary LDC
+    M_H, Teff, logg: Parameters of star
 
     return: Array containing the best-fit parameters for the transit model, Error on parameters
     """
@@ -67,12 +66,9 @@ def fitFromBLS(gbls_ans, phot, koicat=None, idx=None):
     sol.alb = [0.0]
 
     # Calculate Kipping LDC
-    if koicat is not None and idx is not None:
+    if M_H is not None and Teff is not None and logg is not None:
         ld_data_path = '/data2/rowe/exotic_ld_data/'
         ld_model = 'mps1'
-        M_H  = koicat.feh[idx]
-        Teff = koicat.teff[idx]
-        logg = koicat.logg[idx]
         sld = StellarLimbDarkening(M_H, Teff, logg, ld_model, ld_data_path)
         ld, ld_sig = sld.compute_kipping_ld_coeffs(wavelength_range=[0.6*10000, 1.0*10000], mode="TESS", mu_min=0.1, return_sigmas=True)
         sol.nl3 = ld[0]
