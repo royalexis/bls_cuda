@@ -21,8 +21,10 @@ def plotTransit(phot, sol, nintg=41):
 
     t0 = sol.t0[0]
     per = sol.per[0]
+    zpt = sol.zpt
 
-    y_model = transitModel(sol.to_array(), time, itime, nintg)
+    y_model = transitModel(sol.to_array(), time, itime, nintg) - zpt
+    flux = flux - zpt # Remove the zero point to always plot around 1
 
     tdur = transitDuration(sol)*24
     if tdur < 0.01 or np.isnan(tdur):
@@ -51,8 +53,7 @@ def plotTransit(phot, sol, nintg=41):
 
     mpl.rcParams.update({'font.size': 22}) # Adjust font
     plt.figure(figsize=(12,6)) # Adjust size of figure
-    if type(flux) is not int:
-        plt.scatter(phase, flux, c="blue", s=100.0, alpha=0.35, edgecolors="none") #scatter plot
+    plt.scatter(phase, flux, c="blue", s=100.0, alpha=0.35, edgecolors="none") #scatter plot
     plt.plot(phase_sorted, model_sorted, c="red", lw=3.0)
     plt.xlabel('Phase (hours)') #x-label
     plt.ylabel('Relative Flux') #y-label

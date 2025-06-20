@@ -53,3 +53,21 @@ def transitDuration(sol):
     temp2 = 1 - (b/a_Rs)**2
 
     return P/np.pi * np.arcsin(min(1/a_Rs * np.sqrt(temp1/temp2), 1))
+
+def rhostar(P, tdur):
+    """
+    Approximates the star density using the period and transit duration.
+    Uses a simplified formula to relate tdur to a/Rs.
+    P: period in days
+    tdur: transit duration in days
+    """
+    G = 6.674e-11
+
+    # Change to secs
+    P = P*86400
+    tdur = tdur*86400
+
+    rho = 3*P/(np.pi**2 * tdur**3 * G)
+
+    # Change to g/cm^3
+    return rho / 1000

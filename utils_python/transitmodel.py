@@ -105,7 +105,7 @@ class transit_model_class:
         sol[:8] = self.rho, self.nl1, self.nl2, self.nl3, self.nl4, self.dil, self.vof, self.zpt
 
         for i in range(self.npl):
-            sol[10*i + 8 : 10*i + 18] = self.t0[i], self.per[i], self.bb[i], self.rdr[i], self.ecw[i], self.esw[i], \
+            sol[10*i+8 : 10*i+18] = self.t0[i], self.per[i], self.bb[i], self.rdr[i], self.ecw[i], self.esw[i], \
                                         self.krv[i], self.ted[i], self.ell[i], self.alb[i]
             
         return sol

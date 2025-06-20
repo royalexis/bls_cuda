@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.optimize import least_squares
 import utils_python.transitmodel as transitm
+import utils_python.keplerian as kep
+from exotic_ld import StellarLimbDarkening
 import transitPy5 as tpy5
 import bls_cpu as gbls
 
@@ -21,34 +23,35 @@ def analyseLightCurve(gbls_inputs):
     gbls_ans = gbls.bls(gbls_inputs, phot.time[phot.icut == 0], phot.flux[phot.icut == 0])
     
     # Fit using BLS answers
-    sol_fit, err_fit = fitFromBLS(gbls_ans, phot)
+    sol_fit = fitFromBLS(gbls_ans, phot)
 
-    return phot, sol_fit, err_fit, gbls_ans
+    return phot, sol_fit, gbls_ans
 
-def fitFromBLS(gbls_ans, phot):
+def fitFromBLS(gbls_ans, phot, koicat=None, idx=None):
     """
     Fits a transit model using the answers from the bls.
 
     gbls_ans: Answers from the bls
     phot: Phot object from reading data file
+    koicat: Catalogue class. Leave default to use arbitrary LDC
+    idx: Id of star in catalogue. Leave default to use arbitrary LDC
 
     return: Array containing the best-fit parameters for the transit model, Error on parameters
     """
     params_to_fit = ["rho", "zpt", "t0", "per", "bb", "rdr"] # We fit only: rho, zpt, t0, Per, b, Rp/Rs
 
-    sol = transitm.transit_model_class() # Single planet model has up-to 18-model parameters
+    sol = transitm.transit_model_class()
 
     # Set the initial guess using the bls answers.
-    # ld coeff and rho are temporary values
 
-    sol.rho = 0.6  
-    sol.nl1 = 0.0  
-    sol.nl2 = 0.0  
-    sol.nl3 = 0.6  
+    sol.rho = kep.rhostar(gbls_ans.bper, gbls_ans.tdur)
+    sol.nl1 = 0.0
+    sol.nl2 = 0.0
+    sol.nl3 = 0.3
     sol.nl4 = 0.4
     sol.dil = 0.0
     sol.vof = 0.0
-    sol.zpt = np.mean(phot.flux)
+    sol.zpt = np.median(phot.flux)
     sol.t0  = [gbls_ans.epo]
     sol.per = [gbls_ans.bper]
     sol.bb  = [0.5]
@@ -62,6 +65,18 @@ def fitFromBLS(gbls_ans, phot):
     sol.ted = [0.0]
     sol.ell = [0.0]
     sol.alb = [0.0]
+
+    # Calculate Kipping LDC
+    if koicat is not None and idx is not None:
+        ld_data_path = '/data2/rowe/exotic_ld_data/'
+        ld_model = 'mps1'
+        M_H  = koicat.feh[idx]
+        Teff = koicat.teff[idx]
+        logg = koicat.logg[idx]
+        sld = StellarLimbDarkening(M_H, Teff, logg, ld_model, ld_data_path)
+        ld, ld_sig = sld.compute_kipping_ld_coeffs(wavelength_range=[0.6*10000, 1.0*10000], mode="TESS", mu_min=0.1, return_sigmas=True)
+        sol.nl3 = ld[0]
+        sol.nl4 = ld[1]
 
     # Sometimes t0 is negative and crashes the fit
     if gbls_ans.epo < 0:
