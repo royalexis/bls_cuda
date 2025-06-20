@@ -15,6 +15,10 @@ var_to_ind = {
     "ecw": 12, "esw": 13, "krv": 14, "ted": 15, "ell": 16, "alb": 17
 }
 
+# Number of parameters of each type
+nb_st_param = 8
+nb_pl_param = 10
+
 class transit_model_class:
     """
     Class containing all the transit model parameters

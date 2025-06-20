@@ -84,12 +84,13 @@ def fitFromBLS(gbls_ans, phot, koicat=None, idx=None):
 
     return fitTransitModel(sol, params_to_fit, phot)
 
-def createBounds(time, id_to_fit):
+def createBounds(time, id_to_fit, sol_obj):
     """
     Creates the bounds for the parameters
 
     time: time array
     id_to_fit: Array containing the indices of the parameters to fit
+    sol_obj: Transit model object with initial parameters
     """
     min_t = min(time)
     max_t = max(time)
@@ -97,6 +98,11 @@ def createBounds(time, id_to_fit):
     # Rho and Rp/Rs are in log space
     lower_bound = np.array([np.log(1e-4), 0, -1, 0, 0, 0, -np.inf, -np.inf, min_t, min_t, 0, -np.inf, -1, -1, -np.inf, -np.inf, -np.inf, -np.inf])
     upper_bound = np.array([np.log(1e3), 2, 1, 1, 1, 1, np.inf, np.inf, max_t, max_t, 2, 0, 1, 1, np.inf, np.inf, np.inf, np.inf])
+
+    # Expand bounds for multiple planets
+    for i in range(sol_obj.npl - 1):
+        lower_bound = np.append(lower_bound, lower_bound[transitm.nb_st_param:])
+        upper_bound = np.append(upper_bound, upper_bound[transitm.nb_st_param:])
 
     return (lower_bound[id_to_fit], upper_bound[id_to_fit])
 
@@ -121,27 +127,33 @@ def fitTransitModel(sol_obj, params_to_fit, phot):
     # Transform solution object to array
     sol = sol_obj.to_array()
 
-    log_space_params = [transitm.var_to_ind["rho"], transitm.var_to_ind["rdr"]] # Rho and Rp/Rs are in log space
-    id_to_fit = [transitm.var_to_ind[param] for param in params_to_fit]
+    log_space_params = np.array([transitm.var_to_ind["rho"], transitm.var_to_ind["rdr"]]) # Rho and Rp/Rs are in log space
+    id_to_fit = np.array([transitm.var_to_ind[param] for param in params_to_fit])
+
+    # Expand indices arrays to fit multiple planets
+    for i in range(sol_obj.npl - 1):
+        id_to_fit = np.append(id_to_fit, id_to_fit[id_to_fit >= transitm.nb_st_param] + transitm.nb_pl_param)
+        log_space_params = np.append(log_space_params, log_space_params[log_space_params >= transitm.nb_st_param] + transitm.nb_pl_param)
 
     # Fit only the parameters in id_to_fit
     sol_full = np.copy(sol) # Copy the initial guess
-    def wrapperTransit(sol_free, time, flux, ferror, itime):
+    def wrapperTransit(sol_free, time, flux, ferror, itime, npl):
         """ Wrapper function that takes only the free parameters as arguments """
         for i, ind in enumerate(id_to_fit):
             if ind in log_space_params:
                 sol_full[ind] = np.exp(sol_free[i])
             else:
                 sol_full[ind] = sol_free[i]
-        return transitToOptimize(sol_full, time, flux, ferror, itime)
+        
+        return transitToOptimize(sol_full, time, flux, ferror, itime, npl)
     
-    bounds = createBounds(time, id_to_fit)
+    bounds = createBounds(time, id_to_fit, sol_obj)
 
     # Take the log of log space parameters
     for i in log_space_params:
         sol[i] = np.log(sol[i])
 
-    res = least_squares(wrapperTransit, sol[id_to_fit], bounds=bounds, args=(time, flux, ferror, itime))
+    res = least_squares(wrapperTransit, sol[id_to_fit], bounds=bounds, args=(time, flux, ferror, itime, sol_obj.npl))
 
     # Calculate error
     is_weighted = True
@@ -164,21 +176,23 @@ def fitTransitModel(sol_obj, params_to_fit, phot):
 
     return fit_params
 
-def transitToOptimize(sol, time, flux, ferror, itime):
+def transitToOptimize(sol, time, flux, ferror, itime, npl):
     """
     Handles constraints and returns the vector of differences. You shouldn't have to call this function
 
     sol: Array of transit model parameters for fitting
     time, flux, ferror: Data arrays
     itime: Integration time array
+    npl: Number of planets
     """
     n = len(time)
 
     # Parameter constraints (Return a big number if constraint is not respected)
-    b = sol[10]
-    Rp_Rs = sol[11]
-    if b > 1 + Rp_Rs:
-        return np.full(n, 1e20)
+    for i in range(npl):
+        b = sol[10 + i*transitm.nb_pl_param]
+        Rp_Rs = sol[11 + i*transitm.nb_pl_param]
+        if b > 1 + Rp_Rs:
+            return np.full(n, 1e20)
     
     c1, c2, c3, c4 = sol[1], sol[2], sol[3], sol[4]
     # Quadratic coefficients
