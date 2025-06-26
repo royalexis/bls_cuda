@@ -11,7 +11,7 @@ def plotTransit(phot, sol, nintg=41, pl_to_plot=0):
     phot: Phot object from reading data file
     sol: Transit model object with parameters
     nintg: Number of points inside the integration time
-    pl_to_plot: Index of planet to plot. 0 is the first planet
+    pl_to_plot: Index of planet to plot. 0 being the first planet
     """
 
     # Read phot class
@@ -23,20 +23,31 @@ def plotTransit(phot, sol, nintg=41, pl_to_plot=0):
     per = sol.per[pl_to_plot]
     zpt = sol.zpt
 
-    y_model = transitModel(sol.to_array(), time, itime, nintg) - zpt
+    # Copy the original Rp/R* before modifying it
+    rdr = sol.rdr.copy()
+
+    # Remove the other planets from the model
+    for i in range(sol.npl):
+        if i != pl_to_plot:
+            sol.rdr[i] = 0
+
+    tmodel = transitModel(sol.to_array(), time, itime, nintg) - zpt
     flux = flux - zpt # Remove the zero point to always plot around 1
 
     tdur = transitDuration(sol, pl_to_plot)*24
     if tdur < 0.01 or np.isnan(tdur):
         tdur = 2
 
+    # Restore the original Rp/R*
+    sol.rdr = rdr
+
     # Fold the time array and sort it
     phase = (time - per*np.floor(time/per) - t0 + per*np.floor(t0/per))*24
     i_sort = np.argsort(phase)
     phase_sorted = phase[i_sort]
-    model_sorted = y_model[i_sort]
+    model_sorted = tmodel[i_sort]
 
-    stdev = np.std(flux - y_model)
+    stdev = np.std(flux - tmodel)
 
     # Find bounds of plot
     i1, i2 = np.searchsorted(phase_sorted, (-tdur, tdur))
@@ -58,6 +69,7 @@ def plotTransit(phot, sol, nintg=41, pl_to_plot=0):
     plt.xlabel('Phase (hours)') #x-label
     plt.ylabel('Relative Flux') #y-label
     plt.axis((-1.5*tdur, 1.5*tdur, y1, y2))
+    plt.tick_params(direction="in")
     plt.show()
 
 def printParams(sol):
