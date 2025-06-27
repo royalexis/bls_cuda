@@ -118,7 +118,7 @@ class transit_model_class:
 def transitModel(sol, time, itime, nintg=41,
                  ntt=np.zeros(1, dtype="int32"), tobs=np.zeros((1,1)), omc=np.zeros((1,1))):
     """
-    Computes a Transit Model.
+    Computes a transit light curve.
 
     sol: Array containing all the parameters. To view the list of params, see transit_model_class
     time: Time array

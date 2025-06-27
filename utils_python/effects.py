@@ -32,8 +32,8 @@ def ttv_lininterp(x, y, ntt, xin, npl):
     elif xin <= x[npl, 0]:
         yout = y[npl,0] + (xin - x[npl,0]) / (x[npl,1] - x[npl,0]) * (y[npl,1] - y[npl,0])
 
-    elif xin >= x[npl, ntt[npl]]:
-        n_ttv = ntt[npl]
+    elif xin >= x[npl, ntt[npl] - 1]:
+        n_ttv = ntt[npl] - 1
         yout = y[npl,n_ttv] + (xin - x[npl,n_ttv]) / (x[npl,n_ttv] - x[npl,n_ttv-1]) * (y[npl,n_ttv] - y[npl,n_ttv-1])
 
     else:
