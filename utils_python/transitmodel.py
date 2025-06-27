@@ -1,7 +1,7 @@
 import numpy as np
 import utils_python.keplerian as kep
 import utils_python.occult as occ
-from utils_python.effects import albedoMod
+from utils_python.effects import albedoMod, ttv_lininterp
 from numba import njit, prange
 
 # Constants
@@ -115,7 +115,8 @@ class transit_model_class:
         return sol
 
 @njit(parallel=True, cache=True)
-def transitModel(sol, time, itime, nintg=41):
+def transitModel(sol, time, itime, nintg=41,
+                 ntt=np.zeros(1, dtype="int32"), tobs=np.zeros((1,1)), omc=np.zeros((1,1))):
     """
     Computes a Transit Model.
 
@@ -123,6 +124,9 @@ def transitModel(sol, time, itime, nintg=41):
     time: Time array
     itime: Integration time array. Has to be the same length as time
     nintg: Number of points inside the integration time
+    ntt: 1D array containing nb of ttv. shape=(nb_planet,)
+    tobs: 2D array containing times of ttv. shape=(nb_planet, nb_ttv)
+    omc: 2D array of o-c. shape=(nb_planet, nb_ttv)
 
     return: Array containing the flux values. Same length as the time array
     """
@@ -146,6 +150,12 @@ def transitModel(sol, time, itime, nintg=41):
     dtype = np.zeros(nb_pts) # Photometry only
 
     n_planet = (len(sol) - 8) // 10
+
+    # Handle TTV inputs
+    if np.all(ntt == 0) or np.all(tobs == 0) or np.all(omc == 0):
+        ntt = np.zeros(n_planet, dtype="int32") # Number of TTVs measured 
+        tobs = np.zeros((n_planet, nb_pts)) # Time stamps of TTV measurements (days)
+        omc = np.zeros((n_planet, nb_pts)) # TTV measurements (O-C) (days)
 
     # Loop over every planet
     for ii in range(n_planet):
@@ -198,9 +208,9 @@ def transitModel(sol, time, itime, nintg=41):
 
         # Loop over all of the points
         for i in prange(nb_pts):
-            ttcor = 0 # For now
             time_i = time[i]
             itime_i = itime[i]
+            ttcor = ttv_lininterp(tobs, omc, ntt, time_i, ii)
 
             tflux = np.empty(nintg)
             vt = np.empty(nintg)
