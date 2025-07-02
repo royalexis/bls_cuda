@@ -12,7 +12,7 @@ def analyseLightCurve(gbls_inputs):
 
     gbls_inputs: Inputs of the bls
 
-    Returns: phot object, best-fit parameters returned by fit, error on params, answers from BLS
+    Returns: phot object, transit model object, answers from BLS
     """
 
     # Read data
@@ -35,7 +35,7 @@ def fitFromBLS(gbls_ans, phot, M_H=None, Teff=None, logg=None):
     phot: Phot object from reading data file
     M_H, Teff, logg: Parameters of star
 
-    return: Array containing the best-fit parameters for the transit model, Error on parameters
+    return: New transit model object containing the parameters and errors after fitting
     """
     params_to_fit = ["rho", "zpt", "t0", "per", "bb", "rdr"] # We fit only: rho, zpt, t0, Per, b, Rp/Rs
 
@@ -110,8 +110,7 @@ def fitTransitModel(sol_obj, params_to_fit, phot):
     params_to_fit: List containing strings of the names of the parameters to fit according to the tm class
     phot: Phot object from reading data file
 
-    return: Array containing the best-fit parameters for the transit model, Error on parameters
-            These arrays are the same size as sol_obj, with the fixed parameters untouched.
+    return: New transit model object containing the parameters and errors after fitting
     """
 
     # Read phot class

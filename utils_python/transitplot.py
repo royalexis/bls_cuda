@@ -80,7 +80,7 @@ def printParams(sol):
     """
 
     stellarDict = {
-        "ρ (g/cm³)": "rho", "c1": "nl1", "c2": "nl2", "q1": "nl3", "q2": "nl4",
+        "ρ* (g/cm³)": "rho", "c1": "nl1", "c2": "nl2", "q1": "nl3", "q2": "nl4",
         "Dilution": "dil", "Velocity Offset": "vof", "Photometric zero point": "zpt"
     }
 
