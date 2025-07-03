@@ -1,9 +1,34 @@
 import numpy as np
 import utils_python.transitmodel as transitm
 
-def loglikehood(sol, time, flux, ferror, itime):
+def mcmcTransitModel(sol, params_to_fit):
+    """
+    Returns the new log functions and the sol array to use for mcmc
 
-    model = transitm.transitModel(sol, time, itime)
+    sol: Transit Model object containing the initial parameters
+    params_to_fit: List containing strings of the names of the parameters to fit according to the tm class
+
+    return: New log likelihood function, New log Prior function, Array of initial parameters to pass to mcmc
+    """
+    id_to_fit = [transitm.var_to_ind[param] for param in params_to_fit]
+    sol_a = sol.to_array()
+    
+    def newLoglikehood(modelFunc, fit_sol, time, flux, ferror, itime):
+        for i, ind in enumerate(id_to_fit):
+            sol_a[ind] = fit_sol[i]
+        return loglikehood(modelFunc, sol_a, time, flux, ferror, itime)
+    
+    def newLogPrior(fit_sol, time):
+        for i, ind in enumerate(id_to_fit):
+            sol_a[ind] = fit_sol[i]
+        return logprior(sol_a, time)
+    
+    return newLoglikehood, newLogPrior, sol_a[id_to_fit]
+
+
+def loglikehood(modelFunc, sol, time, flux, ferror, itime):
+
+    model = modelFunc(sol, time, itime)
 
     n = len(flux)
 

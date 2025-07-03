@@ -4,22 +4,21 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter
 from matplotlib.ticker import ScalarFormatter
 import progressbar
-import random
 
-def mhgmcmc(x,llx,beta,t,data,derr,itime,loglikelihood,lprior,id_to_fit):
+def mhgmcmc(x,llx,beta,func,loglikelihood,lprior,buffer,corbeta,loglikeArgs=[],lpriorArgs=[]):
     "A Metropolis-Hastings MCMC with Gibbs sampler"
     
     xt=np.copy(x)                            #make a copy of our current state to the trail state
-    npars=len(id_to_fit)                             #number of parameters
-    n=random.choice(id_to_fit)           #random select a parameter to vary.
+    npars=len(x)                             #number of parameters
+    n=int(np.random.rand()*npars)            #random select a parameter to vary.
     
     if beta[n] <= 0:
         xt[n]+=0
     else:
         xt[n]+=np.random.normal(0.0,beta[n]) #Step 2: Generate trial state with Gibbs sampler 
         
-    llxt=loglikelihood(xt,t,data,derr,itime)         #Step 3 Compute log(p(x'|d))=log(p(x'))+log(p(d|x'))
-    llxt+=lprior(xt,t) 
+    llxt=loglikelihood(func,xt,*loglikeArgs)         #Step 3 Compute log(p(x'|d))=log(p(x'))+log(p(d|x'))
+    llxt+=lprior(xt,*lpriorArgs) 
     
     alpha=min(np.exp(llxt-llx),1.0)          #Step 4 Compute the acceptance probability
     
@@ -81,23 +80,22 @@ def demhmcmc(x,llx,beta,data,func,loglikelihood,lprior,buffer,corbeta):
     xp1=np.array(xp1)
     return xp1,llxp1,ac;                     #return new state and log(p(x|d)) 
 
-def genchain(x,t,data,derr,itime,beta,niter,loglikelihood,lprior,mcmcfunc,id_to_fit,buffer=[],corbeta=1,pbar=0): 
+def genchain(x,beta,niter,func,loglikelihood,lprior,mcmcfunc,buffer=[],corbeta=1,pbar=0,loglikeArgs=[],lpriorArgs=[]): 
     "Generate Markov Chain"
-    x_cut = x[id_to_fit]
     chain=[]                                  #Initialize list to hold chain values
     accept=[]                                 #Track our acceptance rate
-    chain.append(x_cut)                           #Step 1: start the chain
+    chain.append(x)                           #Step 1: start the chain
     accept.append((0,0))
-    llx=loglikelihood(x,t,data,derr,itime)    #pre-compute the log-likelihood for Step 3
-    llx=llx+lprior(x,t)                         #Don't forget your priors!
+    llx=loglikelihood(func,x,*loglikeArgs)    #pre-compute the log-likelihood for Step 3
+    llx=llx+lprior(x,*lpriorArgs)                         #Don't forget your priors!
     
     if pbar > 0:
         bar = progressbar.ProgressBar(max_value=niter-1,term_width=80)
         updatefreq=np.floor(min(len(x)*2,niter))
     
     for i in range(0,niter):
-        x,llx,ac = mcmcfunc(x,llx,beta,t,data,derr,itime,loglikelihood,lprior,id_to_fit)
-        chain.append(x[id_to_fit])
+        x,llx,ac = mcmcfunc(x,llx,beta,func,loglikelihood,lprior,buffer,corbeta,loglikeArgs,lpriorArgs)
+        chain.append(x)
         accept.append(ac)
         if pbar > 1 and i%updatefreq == 0 :
             bar.update(i)
@@ -306,7 +304,7 @@ def calcacrate(accept,burnin,label):
         
     return;
     
-def betarescale(x,data,beta,niter,burnin,func,loglikelihood,lprior,mcmcfunc,imax=20):
+def betarescale(x,beta,niter,burnin,func,loglikelihood,lprior,mcmcfunc,imax=20,loglikeArgs=[],lpriorArgs=[]):
     "Calculate rescaling of beta to improve acceptance rates"
     
     alow = 0.22  #alow, ahigh define the acceptance rate range we want
@@ -324,7 +322,7 @@ def betarescale(x,data,beta,niter,burnin,func,loglikelihood,lprior,mcmcfunc,imax
     corscale=np.ones(npars)
     
     #inital run
-    chain,accept=genchain(x,data,beta,niter,func,loglikelihood,lprior,mcmcfunc) #Get a MC   
+    chain,accept=genchain(x,beta,niter,func,loglikelihood,lprior,mcmcfunc,loglikeArgs=loglikeArgs,lpriorArgs=lpriorArgs) #Get a MC   
     nchain=len(chain[:,0])
     
     #calcalate initial values of npropp and nacor 
@@ -354,7 +352,7 @@ def betarescale(x,data,beta,niter,burnin,func,loglikelihood,lprior,mcmcfunc,imax
         
         #Make another chain starting with xin
         betain=beta*corscale   #New beta for Gibbs sampling   
-        chain,accept=genchain(xin,data,betain,niter,func,loglikelihood,lprior,mcmcfunc) #Get a MC
+        chain,accept=genchain(xin,betain,niter,func,loglikelihood,lprior,mcmcfunc,loglikeArgs=loglikeArgs,lpriorArgs=lpriorArgs) #Get a MC
         xin=chain[niter,:]     #Store current parameter state 
         
         #scan through Markov-Chains and count number of states and acceptances 
