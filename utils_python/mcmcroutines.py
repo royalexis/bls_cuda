@@ -120,19 +120,22 @@ def plotchains(chain,label,colour,burnin,savefig=0):
         plt.savefig(savefig)
     plt.show()
 
-def plotmodels(data,chain,func,burnin,savefig=0):
+def plotmodels(time,data,chain,func,burnin,sol,id_to_fit,savefig=0,funcArgs=[]):
     "Plot the original model, some chains and the mean model"
     plt.figure(figsize=(10,7)) #adjust size of figure
     plt.xlabel('time')            #x-label
     plt.ylabel('f(x)/data')         #y-label
     #plt.plot(t,g,c='red')      
-    plt.scatter(data[:,0],data[:,1],c='blue', s=100.0, alpha=0.8, edgecolors="none", label='data')  #plot our data
+    plt.scatter(time,data,c='blue', s=100.0, alpha=0.8, edgecolors="none", label='data')  #plot our data
     chainlen=len(chain[:,0])   #number of chains
     for i in range(0,200):     #plot 200 random chain elements
         nchain=int(np.random.rand()*(chainlen-burnin)+burnin)  #randomly select a chain element that is not burnin
-        pars=np.copy(chain[nchain,:])                   #select chain
-        plotdata=func(pars,data) #return MC-model with chain element parameters
-        plt.plot(data[:,0],plotdata,c='r', alpha=0.05)                       #plot the MC-model.
+        # Recreate the full solution with the result
+        sol_full = np.copy(sol)
+        for i, ind in enumerate(id_to_fit):
+            sol_full[ind] = chain[nchain,i]
+        plotdata=func(sol_full,time,*funcArgs) #return MC-model with chain element parameters
+        plt.plot(time,plotdata,c='r', alpha=0.05)                       #plot the MC-model.
     #plotdata=func(t,mm)
     #plt.plot(t,plotdata,c='r', alpha=1.0, lw=3, label='mean MC model')
     #plt.plot(t,g,c='green',lw=3, label='input model')
