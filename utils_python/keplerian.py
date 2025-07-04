@@ -38,7 +38,7 @@ def solve_kepler_eq(eccn, Manom, Eanom, thres=1e-6, itmax=100):
 
 def transitDuration(sol, i_planet=0):
     """
-    Calculates the transit duration
+    Calculates the transit duration in the same unit as the period
     """
     G = 6.674e-11
 

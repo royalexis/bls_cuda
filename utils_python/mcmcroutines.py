@@ -3,9 +3,8 @@ from scipy import stats #For Kernel Density Estimation
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter
 from matplotlib.ticker import ScalarFormatter
-import progressbar
 
-def mhgmcmc(x,llx,beta,func,loglikelihood,lprior,buffer,corbeta,loglikeArgs=[],lpriorArgs=[]):
+def mhgmcmc(x,llx,beta,loglikelihood,*args,buffer=[],corbeta=1):
     "A Metropolis-Hastings MCMC with Gibbs sampler"
     
     xt=np.copy(x)                            #make a copy of our current state to the trail state
@@ -17,8 +16,7 @@ def mhgmcmc(x,llx,beta,func,loglikelihood,lprior,buffer,corbeta,loglikeArgs=[],l
     else:
         xt[n]+=np.random.normal(0.0,beta[n]) #Step 2: Generate trial state with Gibbs sampler 
         
-    llxt=loglikelihood(func,xt,*loglikeArgs)         #Step 3 Compute log(p(x'|d))=log(p(x'))+log(p(d|x'))
-    llxt+=lprior(xt,*lpriorArgs) 
+    llxt=loglikelihood(xt,*args)             #Step 3 Compute log(p(x'|d))=log(p(x'))+log(p(d|x'))
     
     alpha=min(np.exp(llxt-llx),1.0)          #Step 4 Compute the acceptance probability
     
@@ -35,7 +33,7 @@ def mhgmcmc(x,llx,beta,func,loglikelihood,lprior,buffer,corbeta,loglikeArgs=[],l
         
     return xp1,llxp1,ac;                     #return new state and log(p(x|d)) 
     
-def demhmcmc(x,llx,beta,data,func,loglikelihood,lprior,buffer,corbeta):
+def demhmcmc(x,llx,beta,loglikelihood,*args,buffer=[],corbeta=1):
     "A Metropolis-Hastings MCMC with Gibbs sampler"
     
     nbuffer=len(buffer[:,0])
@@ -61,8 +59,7 @@ def demhmcmc(x,llx,beta,data,func,loglikelihood,lprior,buffer,corbeta):
         vectorjump=buffer[i1,:]-buffer[i2,:]
         xt=x+vectorjump*corbeta
     
-    llxt=loglikelihood(func,xt,data) #Step 3 Compute log(p(x'|d))=log(p(x'))+log(p(d|x'))
-    llxt=llxt+lprior(xt) 
+    llxt=loglikelihood(xt, *args) #Step 3 Compute log(p(x'|d))=log(p(x'))+log(p(d|x'))
     
     alpha=min(np.exp(llxt-llx),1.0)          #Step 4 Compute the acceptance probability
     
@@ -80,25 +77,19 @@ def demhmcmc(x,llx,beta,data,func,loglikelihood,lprior,buffer,corbeta):
     xp1=np.array(xp1)
     return xp1,llxp1,ac;                     #return new state and log(p(x|d)) 
 
-def genchain(x,beta,niter,func,loglikelihood,lprior,mcmcfunc,buffer=[],corbeta=1,pbar=0,loglikeArgs=[],lpriorArgs=[]): 
+def genchain(x,beta,niter,loglikelihood,mcmcfunc,*args,buffer=[],corbeta=1): 
     "Generate Markov Chain"
     chain=[]                                  #Initialize list to hold chain values
     accept=[]                                 #Track our acceptance rate
     chain.append(x)                           #Step 1: start the chain
     accept.append((0,0))
-    llx=loglikelihood(func,x,*loglikeArgs)    #pre-compute the log-likelihood for Step 3
-    llx=llx+lprior(x,*lpriorArgs)                         #Don't forget your priors!
+    llx=loglikelihood(x,*args)    #pre-compute the log-likelihood for Step 3
     
-    if pbar > 0:
-        bar = progressbar.ProgressBar(max_value=niter-1,term_width=80)
-        updatefreq=np.floor(min(len(x)*2,niter))
     
     for i in range(0,niter):
-        x,llx,ac = mcmcfunc(x,llx,beta,func,loglikelihood,lprior,buffer,corbeta,loglikeArgs,lpriorArgs)
+        x,llx,ac = mcmcfunc(x,llx,beta,loglikelihood,buffer=buffer,corbeta=corbeta,*args)
         chain.append(x)
         accept.append(ac)
-        if pbar > 1 and i%updatefreq == 0 :
-            bar.update(i)
         
     chain=np.array(chain)                     #Convert list to array
     accept=np.array(accept)
@@ -279,12 +270,12 @@ def gelmanrubin(*chain,burnin,npt):
     
     return Rc;
 
-def calcacrate(accept,burnin,label):
+def calcacrate(accept,burnin):
     "Calculate Acceptance Rates"
-    nchain=len(accept[burnin:,0])
-    print ('%s %.3f' % ('Global Acceptance Rate:',(nchain-np.sum(accept[burnin:,0]))/nchain))
+    nchain=len(accept[:,0])
+    print ('%s %.3f' % ('Global Acceptance Rate:',(nchain-burnin-np.sum(accept[burnin:,0]))/(nchain-burnin)))
 
-    for j in range(0,max(accept[burnin:,1])+1):
+    for j in range(max(accept[burnin:,1])+1):
         denprop=0   #this is for deMCMC
         deacrate=0  #this is for deMCMC
         
@@ -299,7 +290,7 @@ def calcacrate(accept,burnin,label):
                 denprop=denprop+1
                 deacrate=deacrate+accept[i,0]
                 
-        print('%s Acceptance Rate %.3f' % (label[j],(nprop-acrate)/nprop))
+        print('%s Acceptance Rate %.3f' % (str(j),(nprop-acrate)/(nprop+1)))
     
     #if we have deMCMC results, report the acceptance rate.
     if denprop > 0:
@@ -307,7 +298,7 @@ def calcacrate(accept,burnin,label):
         
     return;
     
-def betarescale(x,beta,niter,burnin,func,loglikelihood,lprior,mcmcfunc,imax=20,loglikeArgs=[],lpriorArgs=[]):
+def betarescale(x,beta,niter,burnin,loglikelihood,mcmcfunc,*args,imax=20):
     "Calculate rescaling of beta to improve acceptance rates"
     
     alow = 0.22  #alow, ahigh define the acceptance rate range we want
@@ -325,7 +316,7 @@ def betarescale(x,beta,niter,burnin,func,loglikelihood,lprior,mcmcfunc,imax=20,l
     corscale=np.ones(npars)
     
     #inital run
-    chain,accept=genchain(x,beta,niter,func,loglikelihood,lprior,mcmcfunc,loglikeArgs=loglikeArgs,lpriorArgs=lpriorArgs) #Get a MC   
+    chain,accept=genchain(x,beta,niter,loglikelihood,mcmcfunc,*args) #Get a MC   
     nchain=len(chain[:,0])
     
     #calcalate initial values of npropp and nacor 
@@ -355,7 +346,7 @@ def betarescale(x,beta,niter,burnin,func,loglikelihood,lprior,mcmcfunc,imax=20,l
         
         #Make another chain starting with xin
         betain=beta*corscale   #New beta for Gibbs sampling   
-        chain,accept=genchain(xin,betain,niter,func,loglikelihood,lprior,mcmcfunc,loglikeArgs=loglikeArgs,lpriorArgs=lpriorArgs) #Get a MC
+        chain,accept=genchain(xin,betain,niter,loglikelihood,mcmcfunc,*args) #Get a MC
         xin=chain[niter,:]     #Store current parameter state 
         
         #scan through Markov-Chains and count number of states and acceptances 

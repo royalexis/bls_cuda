@@ -3,28 +3,55 @@ import utils_python.transitmodel as transitm
 
 def mcmcTransitModel(sol, params_to_fit):
     """
-    Returns the new log functions and the sol array to use for mcmc
+    Returns the new log function and the sol array to use for mcmc
 
     sol: Transit Model object containing the initial parameters
     params_to_fit: List containing strings of the names of the parameters to fit according to the tm class
 
-    return: New log likelihood function, New log Prior function, Array of initial parameters to pass to mcmc
+    return: New log prob function, Array of initial parameters to pass to mcmc, Initial guess for beta using errors
     """
     id_to_fit = [transitm.var_to_ind[param] for param in params_to_fit]
     sol_a = sol.to_array()
-    
-    def newLoglikehood(modelFunc, fit_sol, time, flux, ferror, itime):
-        for i, ind in enumerate(id_to_fit):
-            sol_a[ind] = fit_sol[i]
-        return loglikehood(modelFunc, sol_a, time, flux, ferror, itime)
-    
-    def newLogPrior(fit_sol, time):
-        for i, ind in enumerate(id_to_fit):
-            sol_a[ind] = fit_sol[i]
-        return logprior(sol_a, time)
-    
-    return newLoglikehood, newLogPrior, sol_a[id_to_fit]
 
+    def newLogprob(fit_sol, time, flux, ferror, itime):
+        for i, ind in enumerate(id_to_fit):
+            sol_a[ind] = fit_sol[i]
+        return logprob(sol_a, time, flux, ferror, itime)
+    
+    beta = sol.err_to_array()[id_to_fit]
+    
+    return newLogprob, sol_a[id_to_fit], beta
+
+def getParams(chain, burnin, sol, params_to_fit):
+    """
+    Generates a transit model object will all the parameters
+    """
+    # Get params from mcmc
+    npars = len(chain[1,:])
+    mm = np.zeros(npars)
+    std = np.zeros(npars)
+    for i in range(npars):
+        mm[i] = np.mean(chain[burnin:,i])
+        std[i] = np.std(chain[burnin:,i])
+
+    # Return to the full array
+    id_to_fit = [transitm.var_to_ind[param] for param in params_to_fit]
+    sol_full = sol.to_array()
+    err_full = np.zeros(len(sol_full))
+
+    for i, ind in enumerate(id_to_fit):
+        sol_full[ind] = mm[i]
+        err_full[ind] = std[i]
+
+    # Generate the object
+    sol_output = transitm.transit_model_class()
+    sol_output.from_array(sol_full)
+    sol_output.load_errors(err_full)
+
+    return sol_output
+
+def logprob(sol, time, flux, ferror, itime):
+    return loglikehood(transitm.transitModel, sol, time, flux, ferror, itime) + logprior(sol, time)
 
 def loglikehood(modelFunc, sol, time, flux, ferror, itime):
 

@@ -113,6 +113,21 @@ class transit_model_class:
                     self.bb[i], self.rdr[i], self.ecw[i], self.esw[i], self.krv[i], self.ted[i], self.ell[i], self.alb[i]
             
         return sol
+    
+    def err_to_array(self):
+        """
+        Return a 1D array containing errors on parameters
+        """
+        len_array = nb_st_param + self.npl*nb_pl_param
+        serr = np.zeros(len_array)
+
+        serr[:nb_st_param] = self.drho, self.dnl1, self.dnl2, self.dnl3, self.dnl4, self.ddil, self.dvof, self.dzpt
+
+        for i in range(self.npl):
+            serr[nb_pl_param*i+nb_st_param : nb_pl_param*i+nb_pl_param+nb_st_param] = self.dt0[i], self.dper[i], \
+                    self.dbb[i], self.drdr[i], self.decw[i], self.desw[i], self.dkrv[i], self.dted[i], self.dell[i], self.dalb[i]
+            
+        return serr
 
 @njit(parallel=True, cache=True)
 def transitModel(sol, time, itime, nintg=41,
