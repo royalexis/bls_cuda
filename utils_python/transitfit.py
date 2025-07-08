@@ -115,7 +115,7 @@ def fitTransitModel(sol_obj, params_to_fit, phot):
 
     # Read phot class
     time = phot.time - min(phot.time)
-    flux = phot.flux + 1
+    flux = phot.flux - np.median(phot.flux) + 1
     ferror = phot.ferr
     itime = phot.itime
     
@@ -146,7 +146,9 @@ def fitTransitModel(sol_obj, params_to_fit, phot):
 
     # Take the log of log space parameters
     for i in log_space_params:
-        sol[i] = np.log(sol[i])
+        # Only take the log if we fit the parameter
+        if i in id_to_fit:
+            sol[i] = np.log(sol[i])
 
     res = least_squares(wrapperTransit, sol[id_to_fit], bounds=bounds, args=(time, flux, ferror, itime, sol_obj.npl))
 

@@ -8,7 +8,7 @@ from numba import njit, prange
 G = 6.674e-11
 Cs = 2.99792458e8
 
-# Dictionnary relating the params to indices of an array
+# Dictionary relating the params to indices of an array
 var_to_ind = {
     "rho": 0, "nl1": 1, "nl2": 2, "nl3": 3, "nl4": 4, "dil": 5,
     "vof": 6, "zpt": 7, "t0": 8, "per": 9, "bb": 10, "rdr": 11,

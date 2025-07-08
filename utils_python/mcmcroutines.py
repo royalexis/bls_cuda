@@ -308,10 +308,10 @@ def betarescale(x,beta,niter,burnin,loglikelihood,mcmcfunc,*args,imax=20):
     
     npars=len(x)   #Number of parameters
     acorsub=np.zeros(npars) 
-    nacor=np.zeros(npars)       #total number of accepted proposals
-    nacorsub=np.zeros(npars)    #total number of accepted proposals immediately prior to rescaling
-    npropp=np.zeros(npars)      #total number of proposals
-    nproppsub=np.zeros(npars)   #total number of proposals immediately prior to rescaling
+    nacor=np.ones(npars)       #total number of accepted proposals
+    nacorsub=np.ones(npars)    #total number of accepted proposals immediately prior to rescaling
+    npropp=np.ones(npars)      #total number of proposals
+    nproppsub=np.ones(npars)   #total number of proposals immediately prior to rescaling
     acrate=np.zeros(npars)      #current acrate 
     corscale=np.ones(npars)
     
@@ -339,18 +339,19 @@ def betarescale(x,beta,niter,burnin,loglikelihood,mcmcfunc,*args,imax=20):
     icount=0   #counter to track iterations
     while (np.sum(afix) > 0):
         icount+=1  #track number of iterations
-        #print(icount)
         
-        nacorsub=np.zeros(npars)  #reset nacorsub counts for each loop
-        nproppsub=np.zeros(npars) #reset nproppsub counts for each loop
+        if icount>1:
+            npropp=np.copy(nproppsub)
+            nacor=np.copy(nacorsub)
+        nacorsub=np.ones(npars)  #reset nacorsub counts for each loop
+        nproppsub=np.ones(npars) #reset nproppsub counts for each loop
         
         #Make another chain starting with xin
         betain=beta*corscale   #New beta for Gibbs sampling   
         chain,accept=genchain(xin,betain,niter,loglikelihood,mcmcfunc,*args) #Get a MC
         xin=chain[niter,:]     #Store current parameter state 
         
-        #scan through Markov-Chains and count number of states and acceptances 
-        for i in range(burnin,nchain): 
+        for i in range(burnin,nchain): #scan through Markov-Chains and count number of states and acceptances 
             j=accept[i,1]
             if acrate[j]>ahigh or acrate[j]<alow: 
                 npropp[j]+=1            #update total number of proposals
@@ -360,16 +361,18 @@ def betarescale(x,beta,niter,burnin,loglikelihood,mcmcfunc,*args,imax=20):
     
         for i in range(0,npars):  #calculate acceptance rates for each parameter that is to updated 
             if afix[i]>0:
-                #calcate current acrates
+                #calculate current acrates
                 acrate[i]=nacorsub[i]/nproppsub[i]
     
-                #calcualte acorsub
+                #calculate acorsub
                 acorsub[i]=(nacor[i]-nacorsub[i])/(npropp[i]-nproppsub[i])
     
                 #calculate corscale
-                corscale[i]=corscale[i]*np.power((acorsub[i]+delta)*0.75/ \
-                 (0.25*(1.0-acorsub[i]+delta)) ,0.25)
+                fterm = (acorsub[i]+delta)*0.75/(0.25*(1.0-acorsub[i]+delta))
+                if fterm > 0.0:
+                    corscale[i]=np.abs(corscale[i]*np.power(fterm ,0.5))
     
+        print('Current Acceptance: ',acrate) #report acceptance rates
         for i in range(0,npars):  #check which parameters have achieved required acceptance rate
             if acrate[i]<ahigh and acrate[i]>alow:
                 afix[i]=0
