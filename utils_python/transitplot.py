@@ -4,20 +4,25 @@ import matplotlib as mpl
 from utils_python.transitmodel import transitModel
 from utils_python.keplerian import transitDuration
 
-def plotTransit(phot, sol, nintg=41, pl_to_plot=0):
+def plotTransit(phot, sol, nintg=41, pl_to_plot=1):
     """
     Plots a transit model. Assuming time is in days. Set flux=0 for no scatterplot.
 
     phot: Phot object from reading data file
     sol: Transit model object with parameters
     nintg: Number of points inside the integration time
-    pl_to_plot: Index of planet to plot. 0 being the first planet
+    pl_to_plot: Index of planet to plot. 1 being the first planet
     """
 
     # Read phot class
     time = phot.time - min(phot.time)
-    flux = phot.flux + 1
+    if np.isclose(np.median(phot.flux), 0, atol=0.2):
+        flux = phot.flux + 1
+    else:
+        flux = phot.flux
     itime = phot.itime
+
+    pl_to_plot -= 1 # Shift indexing to start at 0
 
     t0 = sol.t0[pl_to_plot]
     per = sol.per[pl_to_plot]

@@ -10,7 +10,7 @@ def genmcmcInput(sol, params_to_fit):
 
     return: New log prob function, Array of initial parameters to pass to mcmc, Initial guess for beta using errors
     """
-    id_to_fit = [transitm.var_to_ind[param] for param in params_to_fit]
+    id_to_fit = np.array([transitm.var_to_ind[param] for param in params_to_fit])
     log_space_params = np.array([transitm.var_to_ind["rho"], transitm.var_to_ind["rdr"]]) # Rho and Rp/Rs are in log space
 
     # Expand indices arrays to fit multiple planets
@@ -19,7 +19,7 @@ def genmcmcInput(sol, params_to_fit):
         log_space_params = np.append(log_space_params, log_space_params[log_space_params >= transitm.nb_st_param] + transitm.nb_pl_param)
 
     sol_a = sol.to_array()
-    
+
     def newLogprob(fit_sol, time, flux, ferror, itime):
         for i, ind in enumerate(id_to_fit):
             if ind in log_space_params:
@@ -51,7 +51,7 @@ def getParams(chain, burnin, sol, params_to_fit):
         std[i] = np.std(chain[burnin:,i])
 
     # Return to the full array
-    id_to_fit = [transitm.var_to_ind[param] for param in params_to_fit]
+    id_to_fit = np.array([transitm.var_to_ind[param] for param in params_to_fit])
     log_space_params = np.array([transitm.var_to_ind["rho"], transitm.var_to_ind["rdr"]])
 
     # Expand indices arrays to fit multiple planets
@@ -106,8 +106,8 @@ def logprior(sol, time):
 
     # Expand bounds for multiple planets
     for i in range(npl - 1):
-        lower_bound = np.append(lower_bound, lower_bound[transitm.nb_st_param:])
-        upper_bound = np.append(upper_bound, upper_bound[transitm.nb_st_param:])
+        lbounds = np.append(lbounds, lbounds[transitm.nb_st_param:])
+        ubounds = np.append(ubounds, ubounds[transitm.nb_st_param:])
 
     for i in range(len(sol)):
         if lbounds[i] <= sol[i] <= ubounds[i]:

@@ -74,7 +74,7 @@ class transit_model_class:
 
     def from_array(self, sol):
         """
-        Load object from 1D array. Array has to have a length of (8+10*n) where n is the nb of planets
+        Load parameters from 1D array. Array has to have a length of (8+10*n) where n is the nb of planets
         """
         if (len(sol) - nb_st_param) % nb_pl_param != 0:
             print("Parameters array doesn't have the right length")
@@ -129,11 +129,49 @@ class transit_model_class:
             
         return serr
 
-@njit(parallel=True, cache=True)
-def transitModel(sol, time, itime, nintg=41,
-                 ntt=np.zeros(1, dtype="int32"), tobs=np.zeros((1,1)), omc=np.zeros((1,1))):
+def transitModel(sol, time, itime=-1, nintg=41, ntt=-1, tobs=-1, omc=-1):
     """
     Computes a transit light curve.
+
+    sol: Array or transit model object containing all the parameters. To view the list of params, see transit_model_class
+    time: Time array
+    itime: Integration time array. Optional, defaults to 30 minutes.
+    nintg: Number of points inside the integration time. Optional, defaults to 41.
+    ntt: 1D array containing nb of ttv. shape=(nb_planet,)
+    tobs: 2D array containing times of ttv. shape=(nb_planet, nb_ttv)
+    omc: 2D array of o-c. shape=(nb_planet, nb_ttv)
+
+    return: Array containing the flux values. Same length as the time array
+    """
+
+    if isinstance(sol, (np.ndarray, list)):
+        sol_a = sol
+        n_planet = (len(sol) - nb_st_param) // nb_pl_param
+    else:
+        sol_a = sol.to_array()
+        n_planet = sol.npl
+
+    nb_pts = len(time)
+
+    # Handle integration time
+    if type(itime) in (int, float):
+        if itime < 0:
+            itime = np.full(nb_pts, 0.020434) # 30 minutes integration time
+        else:
+            itime = np.full(nb_pts, float(itime))
+
+    # Handle TTV inputs
+    if ntt == -1:
+        ntt = np.zeros(n_planet, dtype="int32") # Number of TTVs measured 
+        tobs = np.zeros((n_planet, nb_pts)) # Time stamps of TTV measurements (days)
+        omc = np.zeros((n_planet, nb_pts)) # TTV measurements (O-C) (days)
+    
+    return _transitModel(sol_a, time, itime, nintg, ntt, tobs, omc)
+
+@njit(parallel=True, cache=True)
+def _transitModel(sol, time, itime, nintg, ntt, tobs, omc):
+    """
+    Computes a transit light curve without all the input checking.
 
     sol: Array containing all the parameters. To view the list of params, see transit_model_class
     time: Time array
@@ -165,12 +203,6 @@ def transitModel(sol, time, itime, nintg=41,
     dtype = np.zeros(nb_pts) # Photometry only
 
     n_planet = (len(sol) - nb_st_param) // nb_pl_param
-
-    # Handle TTV inputs
-    if np.all(ntt == 0) or np.all(tobs == 0) or np.all(omc == 0):
-        ntt = np.zeros(n_planet, dtype="int32") # Number of TTVs measured 
-        tobs = np.zeros((n_planet, nb_pts)) # Time stamps of TTV measurements (days)
-        omc = np.zeros((n_planet, nb_pts)) # TTV measurements (O-C) (days)
 
     # Loop over every planet
     for ii in range(n_planet):
