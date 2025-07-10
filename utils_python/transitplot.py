@@ -3,8 +3,9 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from utils_python.transitmodel import transitModel
 from utils_python.keplerian import transitDuration
+from utils_python.effects import ttv_lininterp
 
-def plotTransit(phot, sol, nintg=41, pl_to_plot=1):
+def plotTransit(phot, sol, pl_to_plot=1, nintg=41, ntt=-1, tobs=-1, omc=-1):
     """
     Plots a transit model. Assuming time is in days. Set flux=0 for no scatterplot.
 
@@ -15,7 +16,7 @@ def plotTransit(phot, sol, nintg=41, pl_to_plot=1):
     """
 
     # Read phot class
-    time = phot.time - min(phot.time)
+    time = phot.time
     if np.isclose(np.median(phot.flux), 0, atol=0.2):
         flux = phot.flux + 1
     else:
@@ -36,8 +37,13 @@ def plotTransit(phot, sol, nintg=41, pl_to_plot=1):
         if i != pl_to_plot:
             sol.rdr[i] = 0
 
-    tmodel = transitModel(sol.to_array(), time, itime, nintg) - zpt
+    tmodel = transitModel(sol, time, itime, nintg, ntt, tobs, omc) - zpt
     flux = flux - zpt # Remove the zero point to always plot around 1
+
+    # Second model with only the other planets to substract
+    sol.rdr = rdr.copy()
+    sol.rdr[pl_to_plot] = 0
+    tmodel2 = transitModel(sol, time, itime, nintg, ntt, tobs, omc)
 
     tdur = transitDuration(sol, pl_to_plot)*24
     if tdur < 0.01 or np.isnan(tdur):
@@ -46,13 +52,25 @@ def plotTransit(phot, sol, nintg=41, pl_to_plot=1):
     # Restore the original Rp/R*
     sol.rdr = rdr
 
-    # Fold the time array and sort it
-    phase = (time - per*np.floor(time/per) - t0 + per*np.floor(t0/per))*24
+    # Fold the time array and sort it. Handle TTVs
+    ph1 = t0/per - np.floor(t0/per)
+    phase = np.empty(len(time))
+    for i, x in enumerate(time):
+        if type(ntt) is not int and ntt[pl_to_plot] > 0:
+            ttcor = ttv_lininterp(tobs, omc, ntt, x, pl_to_plot)
+        else:
+            ttcor = 0
+        t = x - ttcor
+        phase[i] = (t/per - np.floor(t/per) - ph1) * per*24
+
     i_sort = np.argsort(phase)
     phase_sorted = phase[i_sort]
     model_sorted = tmodel[i_sort]
 
     stdev = np.std(flux - tmodel)
+
+    # Remove the other planets
+    fplot = flux - tmodel2 + 1
 
     # Find bounds of plot
     i1, i2 = np.searchsorted(phase_sorted, (-tdur, tdur))
@@ -69,7 +87,7 @@ def plotTransit(phot, sol, nintg=41, pl_to_plot=1):
 
     mpl.rcParams.update({'font.size': 22}) # Adjust font
     plt.figure(figsize=(12,6)) # Adjust size of figure
-    plt.scatter(phase, flux, c="blue", s=100.0, alpha=0.35, edgecolors="none") #scatter plot
+    plt.scatter(phase, fplot, c="blue", s=100.0, alpha=0.35, edgecolors="none") #scatter plot
     plt.plot(phase_sorted, model_sorted, c="red", lw=3.0)
     plt.xlabel('Phase (hours)') #x-label
     plt.ylabel('Relative Flux') #y-label

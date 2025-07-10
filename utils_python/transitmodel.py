@@ -161,7 +161,7 @@ def transitModel(sol, time, itime=-1, nintg=41, ntt=-1, tobs=-1, omc=-1):
             itime = np.full(nb_pts, float(itime))
 
     # Handle TTV inputs
-    if ntt == -1:
+    if type(ntt) is int:
         ntt = np.zeros(n_planet, dtype="int32") # Number of TTVs measured 
         tobs = np.zeros((n_planet, nb_pts)) # Time stamps of TTV measurements (days)
         omc = np.zeros((n_planet, nb_pts)) # TTV measurements (O-C) (days)

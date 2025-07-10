@@ -1,84 +1,6 @@
 import numpy as np
 from scipy.optimize import least_squares
 import utils_python.transitmodel as transitm
-import utils_python.keplerian as kep
-from exotic_ld import StellarLimbDarkening
-import transitPy5 as tpy5
-import bls_cpu as gbls
-
-def analyseLightCurve(gbls_inputs):
-    """
-    Function to call to analyse a light curve and get the best-fit parameters
-
-    gbls_inputs: Inputs of the bls
-
-    Returns: phot object, transit model object, answers from BLS
-    """
-
-    # Read data
-    phot = tpy5.readphot(gbls_inputs.lcdir + gbls_inputs.filename)
-    
-    # Apply BLS
-    gbls_inputs.zerotime = min(phot.time)
-    gbls_ans = gbls.bls(gbls_inputs, phot.time[phot.icut == 0], phot.flux[phot.icut == 0])
-    
-    # Fit using BLS answers
-    sol_fit = fitFromBLS(gbls_ans, phot)
-
-    return phot, sol_fit, gbls_ans
-
-def fitFromBLS(gbls_ans, phot, M_H=None, Teff=None, logg=None):
-    """
-    Fits a transit model using the answers from the bls.
-
-    gbls_ans: Answers from the bls
-    phot: Phot object from reading data file
-    M_H, Teff, logg: Parameters of star
-
-    return: New transit model object containing the parameters and errors after fitting
-    """
-    params_to_fit = ["rho", "zpt", "t0", "per", "bb", "rdr"] # We fit only: rho, zpt, t0, Per, b, Rp/Rs
-
-    sol = transitm.transit_model_class()
-
-    # Set the initial guess using the bls answers.
-
-    sol.rho = kep.rhostar(gbls_ans.bper, gbls_ans.tdur)
-    sol.nl1 = 0.0
-    sol.nl2 = 0.0
-    sol.nl3 = 0.3
-    sol.nl4 = 0.4
-    sol.dil = 0.0
-    sol.vof = 0.0
-    sol.zpt = np.median(phot.flux)
-    sol.t0  = [gbls_ans.epo]
-    sol.per = [gbls_ans.bper]
-    sol.bb  = [0.5]
-    if gbls_ans.depth < 0:
-        sol.rdr = [1e-5]  
-    else:
-        sol.rdr = [np.sqrt(gbls_ans.depth)]
-    sol.ecw = [0.0]
-    sol.esw = [0.0]
-    sol.krv = [0.0]
-    sol.ted = [0.0]
-    sol.ell = [0.0]
-    sol.alb = [0.0]
-
-    # Calculate Kipping LDC
-    if M_H is not None and Teff is not None and logg is not None:
-        ld_data_path = '/data2/rowe/exotic_ld_data/'
-        ld_model = 'mps1'
-        sld = StellarLimbDarkening(M_H, Teff, logg, ld_model, ld_data_path)
-        ld, ld_sig = sld.compute_kipping_ld_coeffs(wavelength_range=[0.6*10000, 1.0*10000], mode="TESS", mu_min=0.1, return_sigmas=True)
-        sol.nl3 = ld[0]
-        sol.nl4 = ld[1]
-
-    # Sometimes t0 is negative and crashes the fit
-    if gbls_ans.epo < 0:
-        sol.t0[0] += gbls_ans.bper
-
-    return fitTransitModel(sol, params_to_fit, phot)
 
 def createBounds(time, id_to_fit, sol_obj):
     """
@@ -92,17 +14,17 @@ def createBounds(time, id_to_fit, sol_obj):
     max_t = max(time)
 
     # Rho and Rp/Rs are in log space
-    lower_bound = np.array([np.log(1e-4), 0, -1, 0, 0, 0, -np.inf, -np.inf, min_t, min_t, 0, -np.inf, -1, -1, -np.inf, -np.inf, -np.inf, -np.inf])
+    lower_bound = np.array([np.log(1e-4), 0, -1, 0, 0, 0, -np.inf, -np.inf, min_t, 0, 0, -np.inf, -1, -1, -np.inf, -np.inf, -np.inf, -np.inf])
     upper_bound = np.array([np.log(1e3), 2, 1, 1, 1, 1, np.inf, np.inf, max_t, max_t, 2, 0, 1, 1, np.inf, np.inf, np.inf, np.inf])
 
     # Expand bounds for multiple planets
     for i in range(sol_obj.npl - 1):
-        lower_bound = np.append(lower_bound, lower_bound[transitm.nb_st_param:])
-        upper_bound = np.append(upper_bound, upper_bound[transitm.nb_st_param:])
+        lower_bound = np.append(lower_bound, lower_bound[transitm.nb_st_param : (transitm.nb_pl_param + transitm.nb_st_param)])
+        upper_bound = np.append(upper_bound, upper_bound[transitm.nb_st_param : (transitm.nb_pl_param + transitm.nb_st_param)])
 
     return (lower_bound[id_to_fit], upper_bound[id_to_fit])
 
-def fitTransitModel(sol_obj, params_to_fit, phot):
+def fitTransitModel(sol_obj, params_to_fit, phot, nintg=41, ntt=-1, tobs=-1, omc=-1):
     """
     Function to call for fitting
 
@@ -113,8 +35,16 @@ def fitTransitModel(sol_obj, params_to_fit, phot):
     return: New transit model object containing the parameters and errors after fitting
     """
 
+    n_planet = sol_obj.npl
+    nb_pts = len(phot.time)
+    # Handle TTV inputs
+    if type(ntt) is int:
+        ntt = np.zeros(n_planet, dtype="int32") # Number of TTVs measured 
+        tobs = np.zeros((n_planet, nb_pts)) # Time stamps of TTV measurements (days)
+        omc = np.zeros((n_planet, nb_pts)) # TTV measurements (O-C) (days)
+
     # Read phot class
-    time = phot.time - min(phot.time)
+    time = phot.time
     flux = phot.flux - np.median(phot.flux) + 1
     ferror = phot.ferr
     itime = phot.itime
@@ -127,12 +57,15 @@ def fitTransitModel(sol_obj, params_to_fit, phot):
 
     # Expand indices arrays to fit multiple planets
     for i in range(sol_obj.npl - 1):
-        id_to_fit = np.append(id_to_fit, id_to_fit[id_to_fit >= transitm.nb_st_param] + transitm.nb_pl_param)
-        log_space_params = np.append(log_space_params, log_space_params[log_space_params >= transitm.nb_st_param] + transitm.nb_pl_param)
+        mask = (id_to_fit >= transitm.nb_st_param) & (id_to_fit < (transitm.nb_pl_param + transitm.nb_st_param))
+        id_to_fit = np.append(id_to_fit, id_to_fit[mask] + (i+1)*transitm.nb_pl_param)
+
+        mask_log = (log_space_params >= transitm.nb_st_param) & (log_space_params < (transitm.nb_pl_param + transitm.nb_st_param))
+        log_space_params = np.append(log_space_params, log_space_params[mask_log] + (i+1)*transitm.nb_pl_param)
 
     # Fit only the parameters in id_to_fit
     sol_full = np.copy(sol) # Copy the initial guess
-    def wrapperTransit(sol_free, time, flux, ferror, itime, npl):
+    def wrapperTransit(sol_free, time, flux, ferror, itime, npl, nintg, ntt, tobs, omc):
         """ Wrapper function that takes only the free parameters as arguments """
         for i, ind in enumerate(id_to_fit):
             if ind in log_space_params:
@@ -140,7 +73,7 @@ def fitTransitModel(sol_obj, params_to_fit, phot):
             else:
                 sol_full[ind] = sol_free[i]
         
-        return transitToOptimize(sol_full, time, flux, ferror, itime, npl)
+        return transitToOptimize(sol_full, time, flux, ferror, itime, npl, nintg, ntt, tobs, omc)
     
     bounds = createBounds(time, id_to_fit, sol_obj)
 
@@ -150,7 +83,8 @@ def fitTransitModel(sol_obj, params_to_fit, phot):
         if i in id_to_fit:
             sol[i] = np.log(sol[i])
 
-    res = least_squares(wrapperTransit, sol[id_to_fit], bounds=bounds, args=(time, flux, ferror, itime, sol_obj.npl))
+    res = least_squares(wrapperTransit, sol[id_to_fit], bounds=bounds, \
+                    args=(time, flux, ferror, itime, sol_obj.npl, nintg, ntt, tobs, omc))
 
     # Calculate error
     is_weighted = True
@@ -173,7 +107,7 @@ def fitTransitModel(sol_obj, params_to_fit, phot):
 
     return fit_params
 
-def transitToOptimize(sol, time, flux, ferror, itime, npl):
+def transitToOptimize(sol, time, flux, ferror, itime, npl, nintg, ntt, tobs, omc):
     """
     Handles constraints and returns the vector of differences. You shouldn't have to call this function
 
@@ -207,7 +141,7 @@ def transitToOptimize(sol, time, flux, ferror, itime, npl):
         if not (0 < c1 < 1) or not (0 < c2 < 1) or not (0 < c3 < 1) or not (0 < c4 < 1):
             return np.full(n, 1e20)
 
-    y_model = transitm.transitModel(sol, time, itime=itime)
+    y_model = transitm._transitModel(sol, time, itime, nintg, ntt, tobs, omc)
 
     return (y_model - flux)/ferror
 

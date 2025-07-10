@@ -15,8 +15,11 @@ def genmcmcInput(sol, params_to_fit):
 
     # Expand indices arrays to fit multiple planets
     for i in range(sol.npl - 1):
-        id_to_fit = np.append(id_to_fit, id_to_fit[id_to_fit >= transitm.nb_st_param] + transitm.nb_pl_param)
-        log_space_params = np.append(log_space_params, log_space_params[log_space_params >= transitm.nb_st_param] + transitm.nb_pl_param)
+        mask = (id_to_fit >= transitm.nb_st_param) & (id_to_fit < (transitm.nb_pl_param + transitm.nb_st_param))
+        id_to_fit = np.append(id_to_fit, id_to_fit[mask] + (i+1)*transitm.nb_pl_param)
+
+        mask_log = (log_space_params >= transitm.nb_st_param) & (log_space_params < (transitm.nb_pl_param + transitm.nb_st_param))
+        log_space_params = np.append(log_space_params, log_space_params[mask_log] + (i+1)*transitm.nb_pl_param)
 
     sol_a = sol.to_array()
 
@@ -56,8 +59,11 @@ def getParams(chain, burnin, sol, params_to_fit):
 
     # Expand indices arrays to fit multiple planets
     for i in range(sol.npl - 1):
-        id_to_fit = np.append(id_to_fit, id_to_fit[id_to_fit >= transitm.nb_st_param] + transitm.nb_pl_param)
-        log_space_params = np.append(log_space_params, log_space_params[log_space_params >= transitm.nb_st_param] + transitm.nb_pl_param)
+        mask = (id_to_fit >= transitm.nb_st_param) & (id_to_fit < (transitm.nb_pl_param + transitm.nb_st_param))
+        id_to_fit = np.append(id_to_fit, id_to_fit[mask] + (i+1)*transitm.nb_pl_param)
+
+        mask_log = (log_space_params >= transitm.nb_st_param) & (log_space_params < (transitm.nb_pl_param + transitm.nb_st_param))
+        log_space_params = np.append(log_space_params, log_space_params[mask_log] + (i+1)*transitm.nb_pl_param)
 
     sol_full = sol.to_array()
     err_full = np.zeros(len(sol_full))
@@ -100,14 +106,14 @@ def logprior(sol, time):
     max_t = max(time)
 
     ubounds = np.array([1e3, 2, 1, 1, 1, 1, 1, 5, max_t, max_t, 2, 1, 1, 1, 5, 1e3, 1e3, 1e4])
-    lbounds = np.array([1e-4, 0, -1, 0, 0, 0, 0, -5, min_t, min_t, 0, 0, -1, -1, -5, 0, -1e3, 0])
+    lbounds = np.array([1e-4, 0, -1, 0, 0, 0, 0, -5, min_t, 0, 0, 0, -1, -1, -5, 0, -1e3, 0])
 
     npl = (len(sol) - transitm.nb_st_param) // transitm.nb_pl_param
 
     # Expand bounds for multiple planets
     for i in range(npl - 1):
-        lbounds = np.append(lbounds, lbounds[transitm.nb_st_param:])
-        ubounds = np.append(ubounds, ubounds[transitm.nb_st_param:])
+        lbounds = np.append(lbounds, lbounds[transitm.nb_st_param : (transitm.nb_pl_param + transitm.nb_st_param)])
+        ubounds = np.append(ubounds, ubounds[transitm.nb_st_param : (transitm.nb_pl_param + transitm.nb_st_param)])
 
     for i in range(len(sol)):
         if lbounds[i] <= sol[i] <= ubounds[i]:
