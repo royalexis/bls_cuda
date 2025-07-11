@@ -1,5 +1,9 @@
 import numpy as np
 import utils_python.transitmodel as transitm
+import utils_python.keplerian as kep
+import utils_python.mcmcroutines as mcmc
+import transitfit5 as tf
+import time
 
 def genmcmcInput(sol, params_to_fit):
     """
@@ -23,13 +27,13 @@ def genmcmcInput(sol, params_to_fit):
 
     sol_a = sol.to_array()
 
-    def newLogprob(fit_sol, time, flux, ferror, itime):
+    def newLogprob(fit_sol, time, flux, ferror, itime, nintg, ntt, tobs, omc):
         for i, ind in enumerate(id_to_fit):
             if ind in log_space_params:
                 sol_a[ind] = np.exp(fit_sol[i])
             else:
                 sol_a[ind] = fit_sol[i]
-        return logprob(sol_a, time, flux, ferror, itime)
+        return logprob(sol_a, time, flux, ferror, itime, nintg, ntt, tobs, omc)
     
     err_a = sol.err_to_array()
 
@@ -82,12 +86,38 @@ def getParams(chain, burnin, sol, params_to_fit):
 
     return sol_output
 
-def logprob(sol, time, flux, ferror, itime):
-    return loglikehood(transitm.transitModel, sol, time, flux, ferror, itime) + logprior(sol, time)
+def cutOutOfTransit(sol, phot, tdurcut=2):
+    """
+    Cuts data that is out of transit.
+    
+    Returns a new phot object.
+    """
 
-def loglikehood(modelFunc, sol, time, flux, ferror, itime):
+    condition = False
 
-    model = modelFunc(sol, time, itime)
+    for i in range(sol.npl):
+        phase = (phot.time - sol.t0[i])/sol.per[i] - np.floor((phot.time - sol.t0[i])/sol.per[i])
+        phase[phase<-0.5] += 1.0
+        phase[phase>0.5] -= 1.0
+
+        tdur = kep.transitDuration(sol, i)/sol.per[i]
+
+        condition |= (phase > -tdurcut*tdur) & (phase < tdurcut*tdur)
+
+    phot_out = tf.phot_class()
+    phot_out.time = phot.time[condition]
+    phot_out.flux = phot.flux[condition]
+    phot_out.ferr = phot.ferr[condition]
+    phot_out.itime = phot.itime[condition]
+
+    return phot_out
+
+def logprob(sol, time, flux, ferror, itime, nintg, ntt, tobs, omc):
+    return loglikehood(transitm._transitModel, sol, time, flux, ferror, itime, nintg, ntt, tobs, omc) + logprior(sol, time)
+
+def loglikehood(modelFunc, sol, time, flux, ferror, itime, nintg, ntt, tobs, omc):
+
+    model = modelFunc(sol, time, itime, nintg, ntt, tobs, omc)
 
     n = len(flux)
 
@@ -122,3 +152,167 @@ def logprior(sol, time):
             return badprior
     
     return lprior
+
+def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, nintg=41, ntt=-1, tobs=-1, omc=-1):
+    start_time = time.time()
+
+    n_planet = (len(sol_a) - transitm.nb_st_param) // transitm.nb_pl_param
+    nb_pts = len(phot.time)
+    # Handle TTV inputs
+    if type(ntt) is int:
+        ntt = np.zeros(n_planet, dtype="int32") # Number of TTVs measured 
+        tobs = np.zeros((n_planet, nb_pts)) # Time stamps of TTV measurements (days)
+        omc = np.zeros((n_planet, nb_pts)) # TTV measurements (O-C) (days)
+
+    # Read params
+    nsteps1 = params[0]
+    nsteps2 = params[1]
+    nsteps_inc = params[2]
+    burninf = params[3]
+    niter_cor = params[4]
+    burnin_cor = params[5]
+    nthin = params[6]
+    nloopmax = params[7]
+    converge_crit = params[8] 
+    buf_converge_crit = params[9]
+
+    #Check for run-away model
+    TPnsteps=5000
+    TPnthin=1
+    
+    chain,accept=mcmc.genchain(x,beta,TPnsteps,lnprob,mcmc.mhgmcmc,phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc)
+    
+    runtest=np.array(tf.checkperT0(chain,burninf,TPnthin,sol_a,serr))
+    print('runtest:',runtest)
+    runtest2 = runtest + 1.0e-10 #add small eps to avoid division by zero.
+    if int(np.sum(runtest2[runtest2<1.0]/runtest2[runtest2<1.0]))==4.0:
+        TPflag=1 #flag for looping until convergence is met.
+    else:
+        TPflag=0 #run-away
+        
+    #if models are so far so good.. continue
+    if TPflag==1:
+
+        #get better beta 
+        corscale=mcmc.betarescale(x,beta,niter_cor,burnin_cor,lnprob,mcmc.mhgmcmc,
+                                  phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc, imax=10)
+        
+        #first run with M-H to create buffer.
+
+        nloop=0
+        nsteps=np.copy(nsteps1)
+        mcmcloop=True
+        while mcmcloop==True:
+        
+            nloop+=1 #count number of loops
+            
+            hchain1,haccept1=mcmc.genchain(x,beta*corscale,TPnsteps,lnprob,mcmc.mhgmcmc,
+                                           phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc)
+            hchain2,haccept2=mcmc.genchain(x,beta*corscale,TPnsteps,lnprob,mcmc.mhgmcmc,
+                                           phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc)
+            hchain3,haccept3=mcmc.genchain(x,beta*corscale,TPnsteps,lnprob,mcmc.mhgmcmc,
+                                           phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc)
+
+            if nloop==1:
+                chain1=np.copy(hchain1)
+                chain2=np.copy(hchain2)
+                chain3=np.copy(hchain3)
+                accept1=np.copy(haccept1)
+                accept2=np.copy(haccept2)
+                accept3=np.copy(haccept3)
+            else:
+                chain1=np.concatenate((chain1,hchain1))
+                chain2=np.concatenate((chain2,hchain2))
+                chain3=np.concatenate((chain3,hchain3))
+                accept1=np.concatenate((accept1,haccept1))
+                accept2=np.concatenate((accept2,haccept2))
+                accept3=np.concatenate((accept3,haccept3))
+            
+            burnin=int(chain1.shape[0]*burninf)
+            mcmc.calcacrate(accept1,burnin)
+
+            grtest=mcmc.gelmanrubin(chain1,chain2,chain3,burnin=burnin,npt=len(phot.time))
+            print('Gelman-Rubin Convergence:')
+            print('parameter  Rc')
+            for i in range(0,len(chain1[1,:])):
+                print('%8s  %.4f' %(str(i),grtest[i]))
+            if int(np.sum(grtest[grtest<buf_converge_crit]/grtest[grtest<buf_converge_crit]))==len(grtest):
+                mcmcloop=False
+            else:
+                mcmcloop=True
+                nsteps+=nsteps1
+                
+            runtest=np.array(tf.checkperT0(chain1,burninf,TPnthin,sol_a,serr))
+            print('runtest:',runtest)
+            if int(np.sum(runtest[runtest<1.0]/runtest[runtest<1.0]))!=4.0:
+                mcmcloop=False #run-away
+                
+            if nloop>=nloopmax: #break if too many loops
+                mcmcloop=False
+                
+            print("---- %s seconds ----" % (time.time() - start_time))
+                
+        ## Re-use runtest for buffer creation loop.
+        #runtest=np.array(tf.checkperT0(chain1,burninf,TPnthin,sol,serr))
+        #print('runtest:',runtest)
+        if int(np.sum(runtest[runtest<1.0]/runtest[runtest<1.0]))==4.0:
+            mcmcloop=True #flag for looping until convergence is met.
+        else:
+            mcmcloop=False #run-away
+
+        #mcmcloop=True
+        nloop=0
+        nsteps=np.copy(nsteps2)
+        while mcmcloop==True:
+
+            nloop+=1 #count number of loops
+
+            burnin=int(chain1.shape[0]*burninf)
+            buffer=np.concatenate((chain1[burnin:],chain2[burnin:],chain3[burnin:])) #create buffer for deMCMC
+            x1=np.copy(chain1[chain1.shape[0]-1,:])
+            x2=np.copy(chain1[chain1.shape[0]-1,:])
+            x3=np.copy(chain1[chain1.shape[0]-1,:])
+            corbeta=0.3
+            burnin=int(chain1.shape[0]*burninf)
+            chain1,accept1=mcmc.genchain(x1,beta*corscale,nsteps,lnprob,mcmc.demhmcmc,phot.time,phot.flux,phot.ferr,phot.itime,\
+                                         nintg, ntt, tobs, omc,buffer=buffer,corbeta=corbeta)
+            chain2,accept2=mcmc.genchain(x2,beta*corscale,nsteps,lnprob,mcmc.demhmcmc,phot.time,phot.flux,phot.ferr,phot.itime,\
+                                         nintg, ntt, tobs, omc,buffer=buffer,corbeta=corbeta)
+            chain3,accept3=mcmc.genchain(x3,beta*corscale,nsteps,lnprob,mcmc.demhmcmc,phot.time,phot.flux,phot.ferr,phot.itime,\
+                                         nintg, ntt, tobs, omc,buffer=buffer,corbeta=corbeta)
+
+            burnin=int(chain1.shape[0]*burninf)
+
+            grtest=mcmc.gelmanrubin(chain1,chain2,chain3,burnin=burnin,npt=len(phot.time))
+            print('Gelman-Rubin Convergence:')
+            print('parameter  Rc')
+            for i in range(0,len(chain1[1,:])):
+                print('%8s  %.4f' %(str(i),grtest[i]))
+
+            if int(np.sum(grtest[grtest<converge_crit]/grtest[grtest<converge_crit]))==len(grtest):
+                mcmcloop=False
+            else:
+                mcmcloop=True
+
+            burnin=int(chain1.shape[0]*burninf)
+            chain=np.concatenate((chain1[burnin:,],chain2[burnin:,],chain3[burnin:,]))
+            accept=np.concatenate((accept1[burnin:,],accept2[burnin:,],accept3[burnin:,]))
+            burnin=int(chain.shape[0]*burninf)
+            mcmc.calcacrate(accept,burnin)
+
+            nsteps+=nsteps_inc #make longer chain to help with convergence
+            
+            #check for run-away Chain.
+            runtest=np.array(tf.checkperT0(chain1,burninf,nthin,sol_a,serr))
+            print('runtest:',runtest)
+            if int(np.sum(runtest[runtest<1.0]/runtest[runtest<1.0]))!=4.0:
+                mcmcloop=False #run-away
+
+            if nloop>=nloopmax: #break if too many loops
+                mcmcloop=False
+                
+            print("---- %s seconds ----" % (time.time() - start_time))
+            
+        print("done %s seconds ---" % (time.time() - start_time))
+
+        return chain, accept, burnin
