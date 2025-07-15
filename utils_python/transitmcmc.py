@@ -47,21 +47,18 @@ def genmcmcInput(sol, params_to_fit):
 
 def getParams(chain, burnin, sol, params_to_fit):
     """
-    Generates a transit model object will all the parameters
+    Generates a transit model object from the markov chain.
     """
     # Get params from mcmc
-    npars = len(chain[1,:])
-    mm = np.zeros(npars)
-    std = np.zeros(npars)
-    for i in range(npars):
-        mm[i] = np.mean(chain[burnin:,i])
-        std[i] = np.std(chain[burnin:,i])
+    cut_chain = chain[burnin:,:]
+    mm = np.median(cut_chain, axis=0)
+    std = np.std(cut_chain, axis=0)
 
     # Return to the full array
     id_to_fit = np.array([transitm.var_to_ind[param] for param in params_to_fit])
     log_space_params = np.array([transitm.var_to_ind["rho"], transitm.var_to_ind["rdr"]])
 
-    # Expand indices arrays to fit multiple planets
+    # Expand indices arrays for multiple planets
     for i in range(sol.npl - 1):
         mask = (id_to_fit >= transitm.nb_st_param) & (id_to_fit < (transitm.nb_pl_param + transitm.nb_st_param))
         id_to_fit = np.append(id_to_fit, id_to_fit[mask] + (i+1)*transitm.nb_pl_param)

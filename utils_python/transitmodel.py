@@ -15,6 +15,8 @@ var_to_ind = {
     "ecw": 12, "esw": 13, "krv": 14, "ted": 15, "ell": 16, "alb": 17
 }
 
+pl_params = ["t0", "per", "bb", "rdr", "ecw", "esw", "krv", "ted", "ell", "alb"]
+
 # Number of parameters of each type
 nb_st_param = 8
 nb_pl_param = 10
@@ -101,7 +103,7 @@ class transit_model_class:
 
     def to_array(self):
         """
-        Return a 1D array that transitModel() can read, since it is a numba function
+        Return a 1D array that _transitModel() can read, since it is a numba function
         """
         len_array = nb_st_param + self.npl*nb_pl_param
         sol = np.zeros(len_array)
@@ -128,6 +130,16 @@ class transit_model_class:
                     self.dbb[i], self.drdr[i], self.decw[i], self.desw[i], self.dkrv[i], self.dted[i], self.dell[i], self.dalb[i]
             
         return serr
+    
+    def __setattr__(self, name, value):
+        """
+        Allows to pass float (or int) values as planet parameters. Useful with single-planet models
+        """
+        if name in pl_params and type(value) in (float, int):
+            value = [value]
+        
+        return super().__setattr__(name, value)
+        
 
 def transitModel(sol, time, itime=-1, nintg=41, ntt=-1, tobs=-1, omc=-1):
     """
@@ -144,6 +156,7 @@ def transitModel(sol, time, itime=-1, nintg=41, ntt=-1, tobs=-1, omc=-1):
     return: Array containing the flux values. Same length as the time array
     """
 
+    # Handle parameters
     if isinstance(sol, (np.ndarray, list)):
         sol_a = sol
         n_planet = (len(sol) - nb_st_param) // nb_pl_param
