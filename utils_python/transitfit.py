@@ -51,6 +51,7 @@ def fitFromBLS(gbls_ans, time, flux, ferror, itime):
     sol[5]  = 0.0  # dilution
     sol[6]  = 0.0  # Velocity offset
     sol[7]  = 0.0  # Photometric zero point
+    
     sol[8]  = gbls_ans.epo             # Center of transit time (days)
     sol[9]  = gbls_ans.bper            # Orbital Period (days)
     sol[10] = 0.5                      # Impact parameter

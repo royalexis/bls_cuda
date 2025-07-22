@@ -580,6 +580,9 @@ def polydetrend(x, y, z, nfitp, x_c):
         
         # Calculate predicted values
         y_pred = poly_func(x_centred_filtered)
+
+        # Calculate offset (this is removed from the data)
+        offset = poly_func(0.0)
         
         # Calculate chi-squared
         chisq = np.sum(((y_filtered - y_pred) / z_filtered) ** 2)
