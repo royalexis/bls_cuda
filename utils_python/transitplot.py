@@ -45,12 +45,12 @@ def plotTransit(phot, sol, pl_to_plot=1, nintg=41, ntt=-1, tobs=-1, omc=-1):
     sol.rdr[pl_to_plot] = 0
     tmodel2 = transitModel(sol, time, itime, nintg, ntt, tobs, omc)
 
+    # Restore the original Rp/R*
+    sol.rdr = rdr
+
     tdur = transitDuration(sol, pl_to_plot)*24
     if tdur < 0.01 or np.isnan(tdur):
         tdur = 2
-
-    # Restore the original Rp/R*
-    sol.rdr = rdr
 
     # Fold the time array and sort it. Handle TTVs
     ph1 = t0/per - np.floor(t0/per)

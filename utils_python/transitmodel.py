@@ -38,7 +38,7 @@ class transit_model_class:
         self.npl = 1        # Number of planets
         self.t0  = [0.0]    # Center of transit time (days)
         self.per = [1.0]    # Orbital period (days)
-        self.bb  = [0.5]    # Impact parameter
+        self.bb  = [0.5]    # Impact parameter (NOT the square of b, I should probably change its name)
         self.rdr = [0.1]    # Rp/R*
         self.ecw = [0.0]    # sqrt(e)cos(w)
         self.esw = [0.0]    # sqrt(e)sin(w)
@@ -135,7 +135,7 @@ class transit_model_class:
         """
         Allows to pass float (or int) values as planet parameters. Useful with single-planet models
         """
-        if name in pl_params and type(value) in (float, int):
+        if name in pl_params and isinstance(value, (float, int)):
             value = [value]
         
         return super().__setattr__(name, value)

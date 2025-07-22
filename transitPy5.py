@@ -295,9 +295,16 @@ def populate_catalogue(tic_output, exocat, toi_index):
     koicat.rdrsep.append(0.001)
     koicat.rdrsem.append(-0.001)
     
-    koicat.rstar.append(tic_output['data'][0]['rad'])
-    koicat.rstar_ep.append(tic_output['data'][0]['e_rad'])
-    koicat.rstar_em.append(-tic_output['data'][0]['e_rad'])
+    if tic_output['data'][0]['rad'] == None:
+        print('Warning: No R* Available, using Sun')
+        koicat.rstar.append(1)
+        koicat.rstar_ep.append(0.5)
+        koicat.rstar_em.append(0.5)
+    else:
+        koicat.rstar.append(tic_output['data'][0]['rad'])
+        e_rad = tic_output['data'][0]['e_rad'] if tic_output['data'][0]['e_rad'] is not None else 0
+        koicat.rstar_ep.append(e_rad)
+        koicat.rstar_em.append(-e_rad)
     
     if tic_output['data'][0]['Teff'] == None:
         print('Warning: No Teff Available, using Sun')
@@ -317,8 +324,9 @@ def populate_catalogue(tic_output, exocat, toi_index):
         koicat.rhostarmem.append(-0.1)
     else:
         koicat.rhostar.append(tic_output['data'][0]['rho'])
-        koicat.rhostar_ep.append(tic_output['data'][0]['e_rho'])
-        koicat.rhostar_em.append(-tic_output['data'][0]['e_rho'])
+        e_rho = tic_output['data'][0]['e_rho'] if tic_output['data'][0]['e_rho'] is not None else 0
+        koicat.rhostar_ep.append(e_rho)
+        koicat.rhostar_em.append(-e_rho)
         koicat.rhostarm.append(tic_output['data'][0]['rho'])
         koicat.rhostarmep.append(0.1)
         koicat.rhostarmem.append(-0.1)
@@ -330,8 +338,9 @@ def populate_catalogue(tic_output, exocat, toi_index):
         print('Warning: No log(g) Available, using 4.5')
     else:
         koicat.logg.append(tic_output['data'][0]['logg'])
-        koicat.logg_ep.append(tic_output['data'][0]['e_logg'])
-        koicat.logg_em.append(-tic_output['data'][0]['e_logg'])
+        e_logg = tic_output['data'][0]['e_logg'] if tic_output['data'][0]['e_logg'] is not None else 0
+        koicat.logg_ep.append(e_logg)
+        koicat.logg_em.append(-e_logg)
     
     koicat.feh.append(0.0)
     koicat.feh_e.append(1.0)
@@ -406,7 +415,7 @@ def cutoutliers(x, y, nsampmax = 3, sigma = 3.0):
         samps[0:nsamp] = y[i1:i2+1]
         # print(i1, i2, samps)
 
-        std = calc_meddiff(nsamp, samps)
+        std = np.median(np.abs(np.diff(samps)))
 
         if sigma > 0:
             threshold = std * sigma
