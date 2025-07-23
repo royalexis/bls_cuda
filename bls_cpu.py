@@ -439,18 +439,26 @@ def one_over_f(f, alpha, scale):
   """
   return scale / (f ** alpha)
 
-def std_without_outliers(data, sigma=3.0, max_iter=3):
+def std_without_outliers(data, sigma=2.0, max_iter=10):
     """Calculates the standard deviation of data after iteratively removing outliers."""
     if len(data) < 4:
         return np.nan
     data = np.copy(data)
     for _ in range(max_iter):
         if len(data) < 2: break
-        mean, std = np.mean(data), np.std(data)
+        mean, std = np.median(data), np.std(data)
         inliers_mask = np.abs(data - mean) < sigma * std
         if np.all(inliers_mask): break
         data = data[inliers_mask]
     return np.std(data)
+
+# Handle NaNs and interpolate
+def interpolate_std(b_std, b_cen, freq):
+    valid = ~np.isnan(b_std)
+    b_std_filled = np.interp(b_cen, b_cen[valid], b_std[valid])
+    interp_std = np.interp(freq, b_cen, b_std_filled)
+    interp_std[interp_std == 0] = np.nanmean(interp_std)
+    return interp_std
 
 @jit(nopython=True)
 def running_std_with_filter(data, half_window):
@@ -484,65 +492,63 @@ def calc_eph(p, jn1, jn2, npt, time, flux, freqs, ofac, nstep, nb, mintime, Kept
     params, covariance = curve_fit(one_over_f, freqs, np.sqrt(p))
     alpha_fit, scale_fit = params
     filtered = one_over_f(freqs, alpha_fit, scale_fit)
-
-    # filtered = medfilt(np.sqrt(p), kernel_size=width) 
+    
+    #  filtered = medfilt(np.sqrt(p), kernel_size=width) 
 
     data = np.sqrt(p) - filtered
-    half_window = width 
-    running_std = running_std_with_filter(data, half_window)
-    power = (np.sqrt(p) - filtered)/running_std # This is our BLS statistic array for each frequency/period
     
-    # # Define the number of logarithmic bins
-    # num_log_bins = 50 # Should be an input parameter
+    # half_window = width 
+    # running_std = running_std_with_filter(data, half_window)
+    # power = (np.sqrt(p) - filtered)/running_std # This is our BLS statistic array for each frequency/period
     
-    # # Create logarithmically spaced bin edges
-    # log_min = np.log10(freqs.min())
-    # log_max = np.log10(freqs.max())
-    # log_bins = np.logspace(log_min, log_max, num_log_bins)
+    # Define the number of logarithmic bins
+    num_log_bins = 50 # Should be an input parameter
+    
+    # Create logarithmically spaced bin edges
+    log_min = np.log10(freqs.min())
+    log_max = np.log10(freqs.max())
+    log_bins = np.logspace(log_min, log_max, num_log_bins)
 
-    # # Calculate the standard deviation in each bin. [1, 2]
-    # binned_std, bin_edges, _ = stats.binned_statistic(
-    #     freqs,
-    #     np.sqrt(p) - fitted_noise,
-    #     statistic=std_without_outliers,
-    #     bins=log_bins
-    # )
+    # Calculate the standard deviation in each bin. [1, 2]
+    binned_std, bin_edges, _ = stats.binned_statistic(
+        freqs,
+        data,
+        statistic=std_without_outliers,
+        bins=log_bins
+    )
 
-    # # for test in zip(log_bins, binned_std):
-    # #     print(1/test[0], test[1])
+    # for test in zip(log_bins, binned_std):
+    #     print(1/test[0], test[1])
 
-    # # Calculate the central frequency of each bin
-    # bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-
-    # # Handle NaNs and interpolate
-    # def interpolate_std(b_std, b_cen, freq):
-    #     valid = ~np.isnan(b_std)
-    #     b_std_filled = np.interp(b_cen, b_cen[valid], b_std[valid])
-    #     interp_std = np.interp(freq, b_cen, b_std_filled)
-    #     interp_std[interp_std == 0] = np.nanmean(interp_std)
-    #     return interp_std
+    # Calculate the central frequency of each bin
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
     # interpolated_std = interpolate_std(binned_std, bin_centers, freqs)
-    # power = (np.sqrt(p) - fitted_noise) / interpolated_std
+    # power = data / interpolated_std
     
-    # # # It's possible some bins are empty and result in NaN. We should replace NaNs
-    # # # with a reasonable value, like the mean of the other std values, or interpolate.
-    # # # A simple approach is to forward-fill and then back-fill NaNs.
-    # # valid_bins = ~np.isnan(binned_std)
-    # # std_params, _ = curve_fit(
-    # #     one_over_f, 
-    # #     bin_centers[valid_bins], 
-    # #     binned_std[valid_bins]
-    # # )
-    # # beta_fit, C_fit = std_params # beta and C are the parameters for the scatter model
+    # # It's possible some bins are empty and result in NaN. We should replace NaNs
+    # # with a reasonable value, like the mean of the other std values, or interpolate.
+    # # A simple approach is to forward-fill and then back-fill NaNs.
+    # valid_bins = ~np.isnan(binned_std)
+    # std_params, _ = curve_fit(
+    #     one_over_f, 
+    #     bin_centers[valid_bins], 
+    #     binned_std[valid_bins]
+    # )
+    # beta_fit, C_fit = std_params # beta and C are the parameters for the scatter model
 
-    # # # Step 3c: Generate the smooth model for the scatter across all original frequencies
-    # # fitted_std = one_over_f(freqs, beta_fit, C_fit)
+    # # Step 3c: Generate the smooth model for the scatter across all original frequencies
+    # fitted_std = one_over_f(freqs, beta_fit, C_fit)
 
-    # # valid_std_mask = (fitted_std > 0)
-    # # power = np.zeros_like(p)
-    # # power[valid_std_mask] = \
-    # #     (np.sqrt(p[valid_std_mask]) - fitted_noise[valid_std_mask]) / fitted_std[valid_std_mask]
+    # valid_std_mask = (fitted_std > 0)
+    # power = np.zeros_like(p)
+    # power[valid_std_mask] = \
+    #     (np.sqrt(p[valid_std_mask]) - fitted_noise[valid_std_mask]) / fitted_std[valid_std_mask]
+
+    std_fit = np.polyfit(bin_centers, binned_std, 3)
+    std_model = np.poly1d(std_fit)
+
+    power = data / std_model(freqs)
 
     psort = np.argsort(power) #Get sorted indicies to find best event
 
