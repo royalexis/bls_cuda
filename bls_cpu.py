@@ -425,29 +425,6 @@ def makeplot(periods, power, time, flux, mintime, Keptime, epo, bper, bpower, sn
 def is_writable(directory):
     return os.access(directory, os.W_OK)
 
-@jit(nopython=True)
-def running_std_with_filter(data, half_window):
-    # Calculate the overall standard deviation
-    std = np.std(data)
-    
-    # Initialize an array to store the running standard deviations
-    running_std = np.empty(len(data))
-    
-    # Iterate over each element in the data
-    for i in range(len(data)):
-        # Define the start and end indices of the window
-        start_idx = max(0, i - half_window)
-        end_idx = min(len(data), i + half_window + 1)
-        
-        # Extract the window and filter values less than 3 * std
-        window_data = data[start_idx:end_idx]
-        filtered_data = window_data[window_data < 3 * std]
-        
-        # Calculate the standard deviation of the filtered window
-        running_std[i] = np.std(filtered_data)
-    
-    return running_std
-
 def one_over_f(f, alpha, scale):
   """
   A power-law model for 1/f noise.
@@ -474,66 +451,98 @@ def std_without_outliers(data, sigma=3.0, max_iter=3):
         if np.all(inliers_mask): break
         data = data[inliers_mask]
     return np.std(data)
+
+@jit(nopython=True)
+def running_std_with_filter(data, half_window):
+    # Calculate the overall standard deviation
+    std = np.std(data)
+    
+    # Initialize an array to store the running standard deviations
+    running_std = np.empty(len(data))
+    
+    # Iterate over each element in the data
+    for i in range(len(data)):
+        # Define the start and end indices of the window
+        start_idx = max(0, i - half_window)
+        end_idx = min(len(data), i + half_window + 1)
+        
+        # Extract the window and filter values less than 3 * std
+        window_data = data[start_idx:end_idx]
+        filtered_data = window_data[window_data < 3 * std]
+        
+        # Calculate the standard deviation of the filtered window
+        running_std[i] = np.std(filtered_data)
+    
+    return running_std
         
 def calc_eph(p, jn1, jn2, npt, time, flux, freqs, ofac, nstep, nb, mintime, Keptime):
 
     periods = 1/freqs # periods (days)
 
-    # width = np.min((int(ofac*1000)+1,nstep)) # clean up the 1/f ramp from BLS
-    # filtered = medfilt(np.sqrt(p), kernel_size=width) 
-
-    # data = np.sqrt(p) - filtered
-    # std = np.std(data)
-    # half_window = width 
-    # running_std = running_std_with_filter(data, half_window)
-    # power = (np.sqrt(p) - filtered)/running_std # This is our BLS statistic array for each frequency/period
+    width = np.min((int(ofac*1000)+1,nstep)) # clean up the 1/f ramp from BLS
     
-    # power = np.sqrt(p)
-
     params, covariance = curve_fit(one_over_f, freqs, np.sqrt(p))
     alpha_fit, scale_fit = params
-    fitted_noise = one_over_f(freqs, alpha_fit, scale_fit)
+    filtered = one_over_f(freqs, alpha_fit, scale_fit)
 
-    # Define the number of logarithmic bins
-    num_log_bins = 50
+    # filtered = medfilt(np.sqrt(p), kernel_size=width) 
+
+    data = np.sqrt(p) - filtered
+    half_window = width 
+    running_std = running_std_with_filter(data, half_window)
+    power = (np.sqrt(p) - filtered)/running_std # This is our BLS statistic array for each frequency/period
     
-    # Create logarithmically spaced bin edges
-    log_min = np.log10(freqs.min())
-    log_max = np.log10(freqs.max())
-    log_bins = np.logspace(log_min, log_max, num_log_bins)
-
-    # Calculate the standard deviation in each bin. [1, 2]
-    binned_std, bin_edges, _ = stats.binned_statistic(
-        freqs,
-        np.sqrt(p) - fitted_noise,
-        statistic=std_without_outliers,
-        bins=log_bins
-    )
-
-    # for test in zip(log_bins, binned_std):
-    #     print(1/test[0], test[1])
-
-    # Calculate the central frequency of each bin
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    # # Define the number of logarithmic bins
+    # num_log_bins = 50 # Should be an input parameter
     
-    # It's possible some bins are empty and result in NaN. We should replace NaNs
-    # with a reasonable value, like the mean of the other std values, or interpolate.
-    # A simple approach is to forward-fill and then back-fill NaNs.
-    valid_bins = ~np.isnan(binned_std)
-    std_params, _ = curve_fit(
-        one_over_f, 
-        bin_centers[valid_bins], 
-        binned_std[valid_bins]
-    )
-    beta_fit, C_fit = std_params # beta and C are the parameters for the scatter model
+    # # Create logarithmically spaced bin edges
+    # log_min = np.log10(freqs.min())
+    # log_max = np.log10(freqs.max())
+    # log_bins = np.logspace(log_min, log_max, num_log_bins)
 
-    # Step 3c: Generate the smooth model for the scatter across all original frequencies
-    fitted_std = one_over_f(freqs, beta_fit, C_fit)
+    # # Calculate the standard deviation in each bin. [1, 2]
+    # binned_std, bin_edges, _ = stats.binned_statistic(
+    #     freqs,
+    #     np.sqrt(p) - fitted_noise,
+    #     statistic=std_without_outliers,
+    #     bins=log_bins
+    # )
 
-    valid_std_mask = (fitted_std > 0)
-    power = np.zeros_like(p)
-    power[valid_std_mask] = \
-        (np.sqrt(p[valid_std_mask]) - fitted_noise[valid_std_mask]) / fitted_std[valid_std_mask]
+    # # for test in zip(log_bins, binned_std):
+    # #     print(1/test[0], test[1])
+
+    # # Calculate the central frequency of each bin
+    # bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+    # # Handle NaNs and interpolate
+    # def interpolate_std(b_std, b_cen, freq):
+    #     valid = ~np.isnan(b_std)
+    #     b_std_filled = np.interp(b_cen, b_cen[valid], b_std[valid])
+    #     interp_std = np.interp(freq, b_cen, b_std_filled)
+    #     interp_std[interp_std == 0] = np.nanmean(interp_std)
+    #     return interp_std
+
+    # interpolated_std = interpolate_std(binned_std, bin_centers, freqs)
+    # power = (np.sqrt(p) - fitted_noise) / interpolated_std
+    
+    # # # It's possible some bins are empty and result in NaN. We should replace NaNs
+    # # # with a reasonable value, like the mean of the other std values, or interpolate.
+    # # # A simple approach is to forward-fill and then back-fill NaNs.
+    # # valid_bins = ~np.isnan(binned_std)
+    # # std_params, _ = curve_fit(
+    # #     one_over_f, 
+    # #     bin_centers[valid_bins], 
+    # #     binned_std[valid_bins]
+    # # )
+    # # beta_fit, C_fit = std_params # beta and C are the parameters for the scatter model
+
+    # # # Step 3c: Generate the smooth model for the scatter across all original frequencies
+    # # fitted_std = one_over_f(freqs, beta_fit, C_fit)
+
+    # # valid_std_mask = (fitted_std > 0)
+    # # power = np.zeros_like(p)
+    # # power[valid_std_mask] = \
+    # #     (np.sqrt(p[valid_std_mask]) - fitted_noise[valid_std_mask]) / fitted_std[valid_std_mask]
 
     psort = np.argsort(power) #Get sorted indicies to find best event
 
@@ -620,8 +629,8 @@ def bls(gbls_inputs, time = np.array([0]), flux = np.array([0])):
     
     #Calculate the number of steps needed to scan the frequency range 
     nstep = calc_nsteps_cpu(Mstar, Rstar, freq1, freq2, nyq, ofac, npt, df0, nb, minbin)
-    print("freqs: ", freq1, freq2)
-    print("nstep: ", nstep) 
+    # print("freqs: ", freq1, freq2)
+    # print("nstep: ", nstep) 
 
     #no need to break up runs
     nper = nstep
@@ -735,8 +744,8 @@ def bls_kernel(freq, time, flux, nb, Rstar, Mstar):
     q = pifac * Rstar*Rsun / (G*Mstar*Msun)**(1.0/3.0) * fsec**(2.0/3.0)
 
     qmi = q / 2.0
-    if qmi < onehour*freq:
-        qmi = onehour*freq
+    if qmi < onehour*freq/2:
+        qmi = onehour*freq/2
 
     qma = q * 2.0
     if qma > 0.25:
