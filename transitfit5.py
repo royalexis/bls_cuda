@@ -7,8 +7,10 @@ import os
 import numpy as np 
 from numpy import zeros
 from numpy import ones
-import tfit5
-import fittransitmodel as ftf
+
+# import tfit5
+# import fittransitmodel as ftf
+
 import matplotlib  #ploting
 #matplotlib.use("Agg") 
 import matplotlib.pyplot as plt
