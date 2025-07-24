@@ -36,17 +36,16 @@ def solve_kepler_eq(eccn, Manom, Eanom, thres=1e-6, itmax=100):
 
     return Eanom
 
-@njit
-def transitDuration(sol):
+def transitDuration(sol, i_planet=0):
     """
-    Calculates the transit duration
+    Calculates the transit duration in the same unit as the period
     """
     G = 6.674e-11
 
-    density = sol[0]
-    P = sol[9]
-    b = sol[10]
-    Rp_Rs = sol[11]
+    density = sol.rho
+    P = sol.per[i_planet]
+    b = sol.bb[i_planet]
+    Rp_Rs = sol.rdr[i_planet]
 
     a_Rs = 10 * np.cbrt(density * G * (P*86400)**2 / (3*np.pi))
 
@@ -54,3 +53,21 @@ def transitDuration(sol):
     temp2 = 1 - (b/a_Rs)**2
 
     return P/np.pi * np.arcsin(min(1/a_Rs * np.sqrt(temp1/temp2), 1))
+
+def rhostar(P, tdur):
+    """
+    Approximates the star density using the period and transit duration.
+    Uses a simplified formula to relate tdur to a/Rs.
+    P: period in days
+    tdur: transit duration in days
+    """
+    G = 6.674e-11
+
+    # Change to secs
+    P = P*86400
+    tdur = tdur*86400
+
+    rho = 3*P/(np.pi**2 * tdur**3 * G)
+
+    # Change to g/cm^3
+    return rho / 1000
