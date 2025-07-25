@@ -167,14 +167,14 @@ def transitModel(sol, time, itime=-1, nintg=41, ntt=-1, tobs=-1, omc=-1):
     nb_pts = len(time)
 
     # Handle integration time
-    if type(itime) in (int, float):
+    if isinstance(itime, (float, int)):
         if itime < 0:
             itime = np.full(nb_pts, 0.020434) # 30 minutes integration time
         else:
             itime = np.full(nb_pts, float(itime))
 
     # Handle TTV inputs
-    if type(ntt) is int:
+    if isinstance(ntt, int):
         ntt = np.zeros(n_planet, dtype="int32") # Number of TTVs measured 
         tobs = np.zeros((n_planet, nb_pts)) # Time stamps of TTV measurements (days)
         omc = np.zeros((n_planet, nb_pts)) # TTV measurements (O-C) (days)

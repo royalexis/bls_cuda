@@ -355,7 +355,7 @@ def populate_catalogue(tic_output, exocat, toi_index):
 
     return koicat
 
-def get_data_and_catalogues(tpy5_inputs):
+def get_data_and_catalogues(tpy5_inputs, out_dir='./download'):
 
     exocat=readtoicsv(tpy5_inputs.toifile)
     toi_index = [j for j, x in enumerate(exocat.toiid) if x == tpy5_inputs.toi][0]
@@ -363,7 +363,7 @@ def get_data_and_catalogues(tpy5_inputs):
     
     #Get SC Lightcurve for MAST
     #Each Sector/Quarter of data is median corrected independently, then concatentated together.
-    phot_SC=get_tess_data(exocat.ticid[toi_index])  #give the TIC_ID and return SC data.
+    phot_SC=get_tess_data(exocat.ticid[toi_index], out_dir=out_dir)  #give the TIC_ID and return SC data.
 
     #Get Stellar parameters from MAST
     tic_output = ticAdvancedSearch(exocat.ticid[toi_index])

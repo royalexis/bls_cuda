@@ -2,74 +2,6 @@ import numpy as np
 from scipy.optimize import least_squares
 import utils_python.transitmodel as transitm
 
-def analyseLightCurve(gbls_inputs):
-    """
-    Function to call to analyse a light curve and get the best-fit parameters
-
-    fileLoc: Location of string
-    gbls_inputs: Inputs of the bls
-
-    Returns: phot object, best-fit parameters returned by fit, answers from BLS
-    """
-
-    # Read data
-    phot = tpy5.readphot(gbls_inputs.lcdir + gbls_inputs.filename)
-    
-    # Apply BLS
-    gbls_inputs.zerotime = min(phot.time)
-    gbls_ans = gbls.bls(gbls_inputs, phot.time[phot.icut == 0], phot.flux[phot.icut == 0])
-    
-    # Fit using BLS answers
-    sol_fit = fitFromBLS(gbls_ans, phot.time - gbls_inputs.zerotime, phot.flux + 1, phot.ferr, phot.itime)
-
-    return phot, sol_fit, gbls_ans
-
-def fitFromBLS(gbls_ans, time, flux, ferror, itime):
-    """
-    Fits a transit model using the answers from the bls.
-
-    gbls_ans: Answers from the bls
-    time, flux, ferror: Data arrays
-    itime: Integration time array
-
-    return: Array containing the best-fit parameters for the transit model
-    """
-    id_to_fit = np.array([0, 7, 8, 9, 10, 11]) # We fit only: rho, zpt, t0, Per, b, Rp/Rs
-
-    sol = np.zeros(18) # Single planet model has up-to 18-model parameters
-
-    # Set the initial guess using the bls answers.
-    # ld coeff and rho are temporary values
-
-    sol[0]  = 0.6  # Mean stellar density (g/cm^3)
-    sol[1]  = 0.0  # Only used for non-linear limb-darkening
-    sol[2]  = 0.0  # Only used for non-linear limb-darkening
-    sol[3]  = 0.6  # q1 (limb-darkening)
-    sol[4]  = 0.4  # q2 (limb-darkening)
-    sol[5]  = 0.0  # dilution
-    sol[6]  = 0.0  # Velocity offset
-    sol[7]  = 0.0  # Photometric zero point
-    
-    sol[8]  = gbls_ans.epo             # Center of transit time (days)
-    sol[9]  = gbls_ans.bper            # Orbital Period (days)
-    sol[10] = 0.5                      # Impact parameter
-    if gbls_ans.depth < 0:             # Rp/R*
-        sol[11] = 1e-5  
-    else:
-        sol[11] = np.sqrt(gbls_ans.depth)
-    sol[12] = 0.0  # sqrt(e)cos(w)
-    sol[13] = 0.0  # sqrt(e)sin(w)
-    sol[14] = 0.0  # RV amplitude (m/s)
-    sol[15] = 0.0  # thermal eclipse depth (ppm)
-    sol[16] = 0.0  # Ellipsodial variations (ppm)
-    sol[17] = 0.0  # Albedo amplitude (ppm)
-
-    # Sometimes t0 is negative and crashes the fit
-    if gbls_ans.epo < 0:
-        sol[8] += gbls_ans.bper
-
-    return fitTransitModel(sol, id_to_fit, time, flux, ferror, itime)
-
 def createBounds(time, id_to_fit, sol_obj):
     """
     Creates the bounds for the parameters
@@ -92,13 +24,19 @@ def createBounds(time, id_to_fit, sol_obj):
 
     return (lower_bound[id_to_fit], upper_bound[id_to_fit])
 
-def fitTransitModel(sol_obj, params_to_fit, phot, nintg=41, ntt=-1, tobs=-1, omc=-1):
+def fitTransitModel(sol_obj, params_to_fit, phot, nintg=41, zerotime=0, use_flux_f=False, use_icut=False, ntt=-1, tobs=-1, omc=-1):
     """
     Function to call for fitting
 
     sol_obj: Transit model object with initial parameters
     params_to_fit: List containing strings of the names of the parameters to fit according to the tm class
     phot: Phot object from reading data file
+    zerotime: Offset to shift time to 0
+    use_flux_f: Boolean. Use preconditionned data or not
+    use_icut: Boolean. Use phot.icut or not
+    ntt: 1D array containing nb of ttv. shape=(nb_planet,)
+    tobs: 2D array containing times of ttv. shape=(nb_planet, nb_ttv)
+    omc: 2D array of o-c. shape=(nb_planet, nb_ttv)
 
     return: New transit model object containing the parameters and errors after fitting
     """
@@ -111,11 +49,20 @@ def fitTransitModel(sol_obj, params_to_fit, phot, nintg=41, ntt=-1, tobs=-1, omc
         tobs = np.zeros((n_planet, nb_pts)) # Time stamps of TTV measurements (days)
         omc = np.zeros((n_planet, nb_pts)) # TTV measurements (O-C) (days)
 
+    # Handle bad data cut
+    if use_icut:
+        icut = phot.icut
+    else:
+        icut = np.zeros(nb_pts)
+    
     # Read phot class
-    time = phot.time
-    flux = phot.flux - np.median(phot.flux) + 1
-    ferror = phot.ferr
-    itime = phot.itime
+    time = (phot.time - zerotime)[icut == 0]
+    if use_flux_f:
+        flux = (phot.flux_f - np.median(phot.flux_f) + 1)[icut == 0]
+    else:
+        flux = (phot.flux - np.median(phot.flux) + 1)[icut == 0]
+    ferror = phot.ferr[icut == 0]
+    itime = phot.itime[icut == 0]
     
     # Transform solution object to array
     sol = sol_obj.to_array()

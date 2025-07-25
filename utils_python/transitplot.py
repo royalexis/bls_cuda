@@ -5,23 +5,37 @@ from utils_python.transitmodel import transitModel
 from utils_python.keplerian import transitDuration
 from utils_python.effects import ttv_lininterp
 
-def plotTransit(phot, sol, pl_to_plot=1, nintg=41, ntt=-1, tobs=-1, omc=-1):
+def plotTransit(phot, sol, pl_to_plot=1, nintg=41, zerotime=0, use_flux_f=False, use_icut=False, ntt=-1, tobs=-1, omc=-1):
     """
     Plots a transit model. Assuming time is in days. Set flux=0 for no scatterplot.
 
     phot: Phot object from reading data file
     sol: Transit model object with parameters
-    nintg: Number of points inside the integration time
     pl_to_plot: Index of planet to plot. 1 being the first planet
+    nintg: Number of points inside the integration time
+    zerotime: Offset to shift time to 0
+    use_flux_f: Boolean. Use preconditionned data or not
+    use_icut: Boolean. Use phot.icut or not
     """
 
-    # Read phot class
-    time = phot.time
-    if np.isclose(np.median(phot.flux), 0, atol=0.2):
-        flux = phot.flux + 1
+    # Handle bad data cut
+    if use_icut:
+        icut = phot.icut
     else:
-        flux = phot.flux
-    itime = phot.itime
+        icut = np.zeros(len(phot.time))
+
+    # Read phot class
+    if use_flux_f:
+        flux_to_use = phot.flux_f
+    else:
+        flux_to_use = phot.flux
+    
+    time = (phot.time - zerotime)[icut == 0]
+    if np.isclose(np.median(flux_to_use), 0, atol=0.2):
+        flux = (flux_to_use + 1)[icut == 0]
+    else:
+        flux = flux_to_use[icut == 0]
+    itime = phot.itime[icut == 0]
 
     pl_to_plot -= 1 # Shift indexing to start at 0
 
