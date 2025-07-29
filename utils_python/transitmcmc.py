@@ -4,6 +4,7 @@ import utils_python.keplerian as kep
 import utils_python.mcmcroutines as mcmc
 import transitfit5 as tf
 import time
+import matplotlib.pyplot as plt
 
 def genmcmcInput(sol, params_to_fit):
     """
@@ -150,7 +151,60 @@ def logprior(sol, time):
     
     return lprior
 
-def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, nintg=41, ntt=-1, tobs=-1, omc=-1):
+def plotChainsTransit(phot, chain, burnin, sol, params_to_fit, zerotime=0, nplot=100):
+
+    time = phot.time - zerotime
+    flux = phot.flux
+    itime = phot.itime
+
+    nmcmc = len(chain)
+
+    best_sol = getParams(chain, burnin, sol, params_to_fit)
+    t0 = best_sol.t0
+    per = best_sol.per
+
+    # Fold the time array and sort it. Handle TTVs
+    ph1 = t0/per - np.floor(t0/per)
+    phase = np.empty(len(time))
+    for i, x in enumerate(time):
+        ttcor = 0
+        t = x - ttcor
+        phase[i] = (t/per - np.floor(t/per) - ph1) * per*24
+
+    plt.figure(figsize=(12,6))
+    plt.scatter(phase, flux, c="blue", s=100, alpha=0.35, edgecolors="none")
+
+    for i in range(nplot):
+
+        nchain = np.random.randint(burnin, nmcmc)
+
+        # Get parameters
+        sol_chain = getParams(chain[nchain,:], 0, sol, params_to_fit)
+
+        t0 = sol_chain.t0
+        per = sol_chain.per
+
+        # Fold the time array and sort it. Handle TTVs
+        ph1 = t0/per - np.floor(t0/per)
+        phase = np.empty(len(time))
+        for i, x in enumerate(time):
+            ttcor = 0
+            t = x - ttcor
+            phase[i] = (t/per - np.floor(t/per) - ph1) * per*24
+
+        tmodel = transitm.transitModel(sol_chain, time, itime=itime)
+
+        i_sort = np.argsort(phase)
+        phase_sorted = phase[i_sort]
+        model_sorted = tmodel[i_sort]
+        plt.plot(phase_sorted, model_sorted, c="red", alpha=0.1)
+
+    plt.xlabel('Phase (hours)')
+    plt.ylabel('Relative Flux')
+    plt.tick_params(direction="in")
+    plt.show()
+
+def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, nintg=41, ntt=-1, tobs=-1, omc=-1, verbose=True, progress_bar=True):
     start_time = time.time()
 
     n_planet = (len(sol_a) - transitm.nb_st_param) // transitm.nb_pl_param
@@ -177,10 +231,11 @@ def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, nintg=41, ntt=-1, 
     TPnsteps=5000
     TPnthin=1
     
-    chain,accept=mcmc.genchain(x,beta,TPnsteps,lnprob,mcmc.mhgmcmc,phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc)
+    chain,accept=mcmc.genchain(x,beta,TPnsteps,lnprob,mcmc.mhgmcmc,phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc, progress=progress_bar)
     
     runtest=np.array(tf.checkperT0(chain,burninf,TPnthin,sol_a,serr))
-    print('runtest:',runtest)
+    if verbose:
+        print('runtest:',runtest)
     runtest2 = runtest + 1.0e-10 #add small eps to avoid division by zero.
     if int(np.sum(runtest2[runtest2<1.0]/runtest2[runtest2<1.0]))==4.0:
         TPflag=1 #flag for looping until convergence is met.
@@ -192,7 +247,7 @@ def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, nintg=41, ntt=-1, 
 
         #get better beta 
         corscale=mcmc.betarescale(x,beta,niter_cor,burnin_cor,lnprob,mcmc.mhgmcmc,
-                                  phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc, imax=10)
+                                  phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc, imax=10, verbose=verbose)
         
         #first run with M-H to create buffer.
 
@@ -204,11 +259,11 @@ def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, nintg=41, ntt=-1, 
             nloop+=1 #count number of loops
             
             hchain1,haccept1=mcmc.genchain(x,beta*corscale,TPnsteps,lnprob,mcmc.mhgmcmc,
-                                           phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc)
+                                           phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc, progress=progress_bar)
             hchain2,haccept2=mcmc.genchain(x,beta*corscale,TPnsteps,lnprob,mcmc.mhgmcmc,
-                                           phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc)
+                                           phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc, progress=progress_bar)
             hchain3,haccept3=mcmc.genchain(x,beta*corscale,TPnsteps,lnprob,mcmc.mhgmcmc,
-                                           phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc)
+                                           phot.time,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc, progress=progress_bar)
 
             if nloop==1:
                 chain1=np.copy(hchain1)
@@ -226,13 +281,15 @@ def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, nintg=41, ntt=-1, 
                 accept3=np.concatenate((accept3,haccept3))
             
             burnin=int(chain1.shape[0]*burninf)
-            mcmc.calcacrate(accept1,burnin)
+            if verbose:
+                mcmc.calcacrate(accept1,burnin)
 
             grtest=mcmc.gelmanrubin(chain1,chain2,chain3,burnin=burnin,npt=len(phot.time))
-            print('Gelman-Rubin Convergence:')
-            print('parameter  Rc')
-            for i in range(0,len(chain1[1,:])):
-                print('%8s  %.4f' %(str(i),grtest[i]))
+            if verbose:
+                print('Gelman-Rubin Convergence:')
+                print('parameter  Rc')
+                for i in range(0,len(chain1[1,:])):
+                    print('%8s  %.4f' %(str(i),grtest[i]))
             if int(np.sum(grtest[grtest<buf_converge_crit]/grtest[grtest<buf_converge_crit]))==len(grtest):
                 mcmcloop=False
             else:
@@ -240,14 +297,16 @@ def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, nintg=41, ntt=-1, 
                 nsteps+=nsteps1
                 
             runtest=np.array(tf.checkperT0(chain1,burninf,TPnthin,sol_a,serr))
-            print('runtest:',runtest)
+            if verbose:
+                print('runtest:',runtest)
             if int(np.sum(runtest[runtest<1.0]/runtest[runtest<1.0]))!=4.0:
                 mcmcloop=False #run-away
                 
             if nloop>=nloopmax: #break if too many loops
                 mcmcloop=False
-                
-            print("---- %s seconds ----" % (time.time() - start_time))
+            
+            if verbose:
+                print("---- %s seconds ----" % (time.time() - start_time))
                 
         ## Re-use runtest for buffer creation loop.
         #runtest=np.array(tf.checkperT0(chain1,burninf,TPnthin,sol,serr))
@@ -272,19 +331,20 @@ def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, nintg=41, ntt=-1, 
             corbeta=0.3
             burnin=int(chain1.shape[0]*burninf)
             chain1,accept1=mcmc.genchain(x1,beta*corscale,nsteps,lnprob,mcmc.demhmcmc,phot.time,phot.flux,phot.ferr,phot.itime,\
-                                         nintg, ntt, tobs, omc,buffer=buffer,corbeta=corbeta)
+                                         nintg, ntt, tobs, omc,buffer=buffer,corbeta=corbeta, progress=progress_bar)
             chain2,accept2=mcmc.genchain(x2,beta*corscale,nsteps,lnprob,mcmc.demhmcmc,phot.time,phot.flux,phot.ferr,phot.itime,\
-                                         nintg, ntt, tobs, omc,buffer=buffer,corbeta=corbeta)
+                                         nintg, ntt, tobs, omc,buffer=buffer,corbeta=corbeta, progress=progress_bar)
             chain3,accept3=mcmc.genchain(x3,beta*corscale,nsteps,lnprob,mcmc.demhmcmc,phot.time,phot.flux,phot.ferr,phot.itime,\
-                                         nintg, ntt, tobs, omc,buffer=buffer,corbeta=corbeta)
+                                         nintg, ntt, tobs, omc,buffer=buffer,corbeta=corbeta, progress=progress_bar)
 
             burnin=int(chain1.shape[0]*burninf)
 
             grtest=mcmc.gelmanrubin(chain1,chain2,chain3,burnin=burnin,npt=len(phot.time))
-            print('Gelman-Rubin Convergence:')
-            print('parameter  Rc')
-            for i in range(0,len(chain1[1,:])):
-                print('%8s  %.4f' %(str(i),grtest[i]))
+            if verbose:
+                print('Gelman-Rubin Convergence:')
+                print('parameter  Rc')
+                for i in range(0,len(chain1[1,:])):
+                    print('%8s  %.4f' %(str(i),grtest[i]))
 
             if int(np.sum(grtest[grtest<converge_crit]/grtest[grtest<converge_crit]))==len(grtest):
                 mcmcloop=False
@@ -295,21 +355,25 @@ def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, nintg=41, ntt=-1, 
             chain=np.concatenate((chain1[burnin:,],chain2[burnin:,],chain3[burnin:,]))
             accept=np.concatenate((accept1[burnin:,],accept2[burnin:,],accept3[burnin:,]))
             burnin=int(chain.shape[0]*burninf)
-            mcmc.calcacrate(accept,burnin)
+            if verbose:
+                mcmc.calcacrate(accept,burnin)
 
             nsteps+=nsteps_inc #make longer chain to help with convergence
             
             #check for run-away Chain.
             runtest=np.array(tf.checkperT0(chain1,burninf,nthin,sol_a,serr))
-            print('runtest:',runtest)
+            if verbose:
+                print('runtest:',runtest)
             if int(np.sum(runtest[runtest<1.0]/runtest[runtest<1.0]))!=4.0:
                 mcmcloop=False #run-away
 
             if nloop>=nloopmax: #break if too many loops
                 mcmcloop=False
-                
-            print("---- %s seconds ----" % (time.time() - start_time))
             
-        print("done %s seconds ---" % (time.time() - start_time))
+            if verbose:   
+                print("---- %s seconds ----" % (time.time() - start_time))
+
+        if verbose:  
+            print("done %s seconds ---" % (time.time() - start_time))
 
         return chain, accept, burnin

@@ -3,6 +3,7 @@ from scipy import stats #For Kernel Density Estimation
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter
 from matplotlib.ticker import ScalarFormatter
+from tqdm import tqdm
 
 def mhgmcmc(x,llx,beta,loglikelihood,*args,buffer=[],corbeta=1):
     "A Metropolis-Hastings MCMC with Gibbs sampler"
@@ -77,7 +78,7 @@ def demhmcmc(x,llx,beta,loglikelihood,*args,buffer=[],corbeta=1):
     xp1=np.array(xp1)
     return xp1,llxp1,ac;                     #return new state and log(p(x|d)) 
 
-def genchain(x,beta,niter,loglikelihood,mcmcfunc,*args,buffer=[],corbeta=1): 
+def genchain(x,beta,niter,loglikelihood,mcmcfunc,*args,buffer=[],corbeta=1,progress=True): 
     "Generate Markov Chain"
     chain=[]                                  #Initialize list to hold chain values
     accept=[]                                 #Track our acceptance rate
@@ -85,8 +86,12 @@ def genchain(x,beta,niter,loglikelihood,mcmcfunc,*args,buffer=[],corbeta=1):
     accept.append((0,0))
     llx=loglikelihood(x,*args)    #pre-compute the log-likelihood for Step 3
     
+    if progress:
+        range_func = tqdm(range)
+    else:
+        range_func = range
     
-    for i in range(0,niter):
+    for i in range_func(niter):
         x,llx,ac = mcmcfunc(x,llx,beta,loglikelihood,buffer=buffer,corbeta=corbeta,*args)
         chain.append(x)
         accept.append(ac)
@@ -298,7 +303,7 @@ def calcacrate(accept,burnin):
         
     return;
     
-def betarescale(x,beta,niter,burnin,loglikelihood,mcmcfunc,*args,imax=20):
+def betarescale(x,beta,niter,burnin,loglikelihood,mcmcfunc,*args,imax=20,verbose=True):
     "Calculate rescaling of beta to improve acceptance rates"
     
     alow = 0.22  #alow, ahigh define the acceptance rate range we want
@@ -371,17 +376,20 @@ def betarescale(x,beta,niter,burnin,loglikelihood,mcmcfunc,*args,imax=20):
                 fterm = (acorsub[i]+delta)*0.75/(0.25*(1.0-acorsub[i]+delta))
                 if fterm > 0.0:
                     corscale[i]=np.abs(corscale[i]*np.power(fterm ,0.5))
-    
-        print('Current Acceptance: ',acrate) #report acceptance rates
+
+        if verbose:
+            print('Current Acceptance: ',acrate) #report acceptance rates
         for i in range(0,npars):  #check which parameters have achieved required acceptance rate
             if acrate[i]<ahigh and acrate[i]>alow:
                 afix[i]=0
 
         if(icount>imax):   #if too many iterations, then we give up and exit
             afix=np.zeros(npars)
-            print("Too many iterations: icount > imax")
+            if verbose:
+                print("Too many iterations: icount > imax")
     
-    print('Final Acceptance: ',acrate) #report acceptance rates
+    if verbose:
+        print('Final Acceptance: ',acrate) #report acceptance rates
     
     return corscale;
     
