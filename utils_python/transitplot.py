@@ -41,7 +41,6 @@ def plotTransit(phot, sol, pl_to_plot=1, nintg=41, zerotime=0, use_flux_f=False,
 
     t0 = sol.t0[pl_to_plot]
     per = sol.per[pl_to_plot]
-    zpt = sol.zpt
 
     # Copy the original Rp/R* before modifying it
     rdr = sol.rdr.copy()
@@ -51,8 +50,7 @@ def plotTransit(phot, sol, pl_to_plot=1, nintg=41, zerotime=0, use_flux_f=False,
         if i != pl_to_plot:
             sol.rdr[i] = 0
 
-    tmodel = transitModel(sol, time, itime, nintg, ntt, tobs, omc) - zpt
-    flux = flux - zpt # Remove the zero point to always plot around 1
+    tmodel = transitModel(sol, time, itime, nintg, ntt, tobs, omc)
 
     # Second model with only the other planets to substract
     sol.rdr = rdr.copy()
@@ -76,6 +74,10 @@ def plotTransit(phot, sol, pl_to_plot=1, nintg=41, zerotime=0, use_flux_f=False,
             ttcor = 0
         t = x - ttcor
         phase[i] = (t/per - np.floor(t/per) - ph1) * per*24
+
+    # Shift the transit in the middle of the phase curve
+    phase[phase<(-0.5*per*24)] += per*24
+    phase[phase>(0.5*per*24)] -= per*24
 
     i_sort = np.argsort(phase)
     phase_sorted = phase[i_sort]

@@ -58,9 +58,9 @@ def fitTransitModel(sol_obj, params_to_fit, phot, nintg=41, zerotime=0, use_flux
     # Read phot class
     time = (phot.time - zerotime)[icut == 0]
     if use_flux_f:
-        flux = (phot.flux_f - np.median(phot.flux_f) + 1)[icut == 0]
+        flux = phot.flux_f[icut == 0]
     else:
-        flux = (phot.flux - np.median(phot.flux) + 1)[icut == 0]
+        flux = phot.flux[icut == 0]
     ferror = phot.ferr[icut == 0]
     itime = phot.itime[icut == 0]
     
@@ -151,7 +151,7 @@ def transitToOptimize(sol, time, flux, ferror, itime, npl, nintg, ntt, tobs, omc
         if not (0 < c3 < 1) or not (0 < c4 < 1):
             return np.full(n, 1e20)
     
-    # Non linear law
+    # Non linear law (These bounds are most likely wrong)
     else:
         if not (0 < c1 < 1) or not (0 < c2 < 1) or not (0 < c3 < 1) or not (0 < c4 < 1):
             return np.full(n, 1e20)
