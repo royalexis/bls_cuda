@@ -87,11 +87,11 @@ def genchain(x,beta,niter,loglikelihood,mcmcfunc,*args,buffer=[],corbeta=1,progr
     llx=loglikelihood(x,*args)    #pre-compute the log-likelihood for Step 3
     
     if progress:
-        range_func = tqdm(range)
+        range_seq = tqdm(range(niter))
     else:
-        range_func = range
+        range_seq = range(niter)
     
-    for i in range_func(niter):
+    for i in range_seq:
         x,llx,ac = mcmcfunc(x,llx,beta,loglikelihood,buffer=buffer,corbeta=corbeta,*args)
         chain.append(x)
         accept.append(ac)
@@ -303,7 +303,7 @@ def calcacrate(accept,burnin):
         
     return;
     
-def betarescale(x,beta,niter,burnin,loglikelihood,mcmcfunc,*args,imax=20,verbose=True):
+def betarescale(x,beta,niter,burnin,loglikelihood,mcmcfunc,*args,imax=20,verbose=True,progress=True):
     "Calculate rescaling of beta to improve acceptance rates"
     
     alow = 0.22  #alow, ahigh define the acceptance rate range we want
@@ -321,7 +321,7 @@ def betarescale(x,beta,niter,burnin,loglikelihood,mcmcfunc,*args,imax=20,verbose
     corscale=np.ones(npars)
     
     #inital run
-    chain,accept=genchain(x,beta,niter,loglikelihood,mcmcfunc,*args) #Get a MC   
+    chain,accept=genchain(x,beta,niter,loglikelihood,mcmcfunc,*args,progress=progress) #Get a MC   
     nchain=len(chain[:,0])
     
     #calcalate initial values of npropp and nacor 
@@ -353,7 +353,7 @@ def betarescale(x,beta,niter,burnin,loglikelihood,mcmcfunc,*args,imax=20,verbose
         
         #Make another chain starting with xin
         betain=beta*corscale   #New beta for Gibbs sampling   
-        chain,accept=genchain(xin,betain,niter,loglikelihood,mcmcfunc,*args) #Get a MC
+        chain,accept=genchain(xin,betain,niter,loglikelihood,mcmcfunc,*args,progress=progress) #Get a MC
         xin=chain[niter,:]     #Store current parameter state 
         
         for i in range(burnin,nchain): #scan through Markov-Chains and count number of states and acceptances 
