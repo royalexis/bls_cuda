@@ -49,6 +49,13 @@ def genmcmcInput(sol, params_to_fit):
 def getParams(chain, burnin, sol, params_to_fit):
     """
     Generates a transit model object from the markov chain.
+
+    chain: 2D Markov chain
+    burnin: Markov chain burnin
+    sol: Transit model object containing the initial guess. Used to recreate the full solution
+    params_to_fit: List of parameters used for the mcmc fitting
+
+    return: Transit model object containing the parameters from the mcmc
     """
     # Get params from mcmc
     cut_chain = chain[burnin:,:]
@@ -84,9 +91,14 @@ def getParams(chain, burnin, sol, params_to_fit):
 
     return sol_output
 
-def cutOutOfTransit(sol, phot, tdurcut=2):
+def cutOutOfTransit(sol, phot, tdurcut=2, zerotime=0, cut_flux_f=False, cut_icut=False):
     """
-    Cuts data that is out of transit.
+    Cuts data that is out of transit. Considers all the planets in sol.
+
+    sol: Transit model object containing parameters
+    phot: Phot object containing data
+    tdurcut: Fraction of the transit duration to keep on each side of the transit
+    zerotime: Offset to start time at 0
     
     Returns a new phot object.
     """
@@ -94,7 +106,7 @@ def cutOutOfTransit(sol, phot, tdurcut=2):
     condition = False
 
     for i in range(sol.npl):
-        phase = (phot.time - sol.t0[i])/sol.per[i] - np.floor((phot.time - sol.t0[i])/sol.per[i])
+        phase = (phot.time - sol.t0[i] - zerotime)/sol.per[i] - np.floor((phot.time - sol.t0[i] - zerotime)/sol.per[i])
         phase[phase<-0.5] += 1.0
         phase[phase>0.5] -= 1.0
 
@@ -107,6 +119,10 @@ def cutOutOfTransit(sol, phot, tdurcut=2):
     phot_out.flux = phot.flux[condition]
     phot_out.ferr = phot.ferr[condition]
     phot_out.itime = phot.itime[condition]
+    if cut_flux_f:
+        phot_out.flux_f = phot.flux_f[condition]
+    if cut_icut:
+        phot_out.icut = phot.icut[condition]
 
     return phot_out
 
@@ -151,11 +167,32 @@ def logprior(sol, time):
     
     return lprior
 
-def plotChainsTransit(phot, chain, burnin, sol, params_to_fit, zerotime=0, nplot=100):
+def plotChainsTransit(phot, chain, burnin, sol, params_to_fit, zerotime=0, nplot=100, use_flux_f=False, use_icut=False):
+    """
+    Plots a random selection of models from the chain.
 
-    time = phot.time - zerotime
-    flux = phot.flux
-    itime = phot.itime
+    phot: phot object containing data
+    chain: 2D Markov chain
+    burnin: Markov chain burnin
+    sol: Transit model object containing the initial guess. Used to recreate the full solution
+    params_to_fit: List of parameters used for the mcmc fitting
+    zerotime: Offset to start time at 0
+    nplot: Number of models to plot
+    """
+
+    # Handle bad data cut
+    if use_icut:
+        icut = phot.icut
+    else:
+        icut = np.zeros(len(phot.time))
+    
+    # Read phot class
+    time = (phot.time - zerotime)[icut == 0]
+    if use_flux_f:
+        flux = phot.flux_f[icut == 0]
+    else:
+        flux = phot.flux[icut == 0]
+    itime = phot.itime[icut == 0]
 
     nmcmc = chain.shape[0]
 
@@ -228,7 +265,8 @@ def plotChainsTransit(phot, chain, burnin, sol, params_to_fit, zerotime=0, nplot
     plt.tick_params(direction="in")
     plt.show()
 
-def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, zerotime=0, nintg=41, ntt=-1, tobs=-1, omc=-1, verbose=True, progress_bar=True):
+def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, zerotime=0, nintg=41, ntt=-1, tobs=-1, omc=-1,
+                  use_flux_f=False, use_icut=False, verbose=True, progress_bar=True):
     start_time = time.time()
 
     n_planet = (len(sol_a) - transitm.nb_st_param) // transitm.nb_pl_param
@@ -239,7 +277,20 @@ def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, zerotime=0, nintg=
         tobs = np.zeros((n_planet, nb_pts)) # Time stamps of TTV measurements (days)
         omc = np.zeros((n_planet, nb_pts)) # TTV measurements (O-C) (days)
 
-    time_a = phot.time - zerotime
+    # Handle bad data cut
+    if use_icut:
+        icut = phot.icut
+    else:
+        icut = np.zeros(nb_pts)
+    
+    # Read phot class
+    time_a = (phot.time - zerotime)[icut == 0]
+    if use_flux_f:
+        flux = phot.flux_f[icut == 0]
+    else:
+        flux = phot.flux[icut == 0]
+    ferror = phot.ferr[icut == 0]
+    itime = phot.itime[icut == 0]
 
     # Read params
     nsteps1 = params[0]
@@ -261,7 +312,7 @@ def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, zerotime=0, nintg=
     TPnsteps=5000
     TPnthin=1
     
-    chain,accept=mcmc.genchain(x,beta,TPnsteps,lnprob,mcmc.mhgmcmc,time_a,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc, progress=progress_bar)
+    chain,accept=mcmc.genchain(x,beta,TPnsteps,lnprob,mcmc.mhgmcmc,time_a,flux,ferror,itime,nintg, ntt, tobs, omc, progress=progress_bar)
     
     runtest=np.array(tf.checkperT0(chain,burninf,TPnthin,sol_a,serr))
     if verbose:
@@ -277,7 +328,7 @@ def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, zerotime=0, nintg=
 
         #get better beta 
         corscale=mcmc.betarescale(x,beta,niter_cor,burnin_cor,lnprob,mcmc.mhgmcmc,
-                                  time_a,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc, imax=10, verbose=verbose, progress=progress_bar)
+                                  time_a,flux,ferror,itime,nintg, ntt, tobs, omc, imax=10, verbose=verbose, progress=progress_bar)
         
         #first run with M-H to create buffer.
 
@@ -289,11 +340,11 @@ def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, zerotime=0, nintg=
             nloop+=1 #count number of loops
             
             hchain1,haccept1=mcmc.genchain(x,beta*corscale,TPnsteps,lnprob,mcmc.mhgmcmc,
-                                           time_a,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc, progress=progress_bar)
+                                           time_a,flux,ferror,itime,nintg, ntt, tobs, omc, progress=progress_bar)
             hchain2,haccept2=mcmc.genchain(x,beta*corscale,TPnsteps,lnprob,mcmc.mhgmcmc,
-                                           time_a,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc, progress=progress_bar)
+                                           time_a,flux,ferror,itime,nintg, ntt, tobs, omc, progress=progress_bar)
             hchain3,haccept3=mcmc.genchain(x,beta*corscale,TPnsteps,lnprob,mcmc.mhgmcmc,
-                                           time_a,phot.flux,phot.ferr,phot.itime,nintg, ntt, tobs, omc, progress=progress_bar)
+                                           time_a,flux,ferror,itime,nintg, ntt, tobs, omc, progress=progress_bar)
 
             if nloop==1:
                 chain1=np.copy(hchain1)
@@ -360,11 +411,11 @@ def demcmcRoutine(x, beta, phot, sol_a, serr, params, lnprob, zerotime=0, nintg=
             x3=np.copy(chain1[chain1.shape[0]-1,:])
             corbeta=0.3
             burnin=int(chain1.shape[0]*burninf)
-            chain1,accept1=mcmc.genchain(x1,beta*corscale,nsteps,lnprob,mcmc.demhmcmc,time_a,phot.flux,phot.ferr,phot.itime,\
+            chain1,accept1=mcmc.genchain(x1,beta*corscale,nsteps,lnprob,mcmc.demhmcmc,time_a,flux,ferror,itime,\
                                          nintg, ntt, tobs, omc,buffer=buffer,corbeta=corbeta, progress=progress_bar)
-            chain2,accept2=mcmc.genchain(x2,beta*corscale,nsteps,lnprob,mcmc.demhmcmc,time_a,phot.flux,phot.ferr,phot.itime,\
+            chain2,accept2=mcmc.genchain(x2,beta*corscale,nsteps,lnprob,mcmc.demhmcmc,time_a,flux,ferror,itime,\
                                          nintg, ntt, tobs, omc,buffer=buffer,corbeta=corbeta, progress=progress_bar)
-            chain3,accept3=mcmc.genchain(x3,beta*corscale,nsteps,lnprob,mcmc.demhmcmc,time_a,phot.flux,phot.ferr,phot.itime,\
+            chain3,accept3=mcmc.genchain(x3,beta*corscale,nsteps,lnprob,mcmc.demhmcmc,time_a,flux,ferror,itime,\
                                          nintg, ntt, tobs, omc,buffer=buffer,corbeta=corbeta, progress=progress_bar)
 
             burnin=int(chain1.shape[0]*burninf)
