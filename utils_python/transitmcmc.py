@@ -2,6 +2,7 @@ import numpy as np
 import utils_python.transitmodel as transitm
 import utils_python.keplerian as kep
 import utils_python.mcmcroutines as mcmc
+from utils_python.effects import ttv_lininterp
 import transitfit5 as tf
 import time
 import matplotlib.pyplot as plt
@@ -167,7 +168,8 @@ def logprior(sol, time):
     
     return lprior
 
-def plotChainsTransit(phot, chain, burnin, sol, params_to_fit, zerotime=0, nplot=100, use_flux_f=False, use_icut=False):
+def plotChainsTransit(phot, chain, burnin, sol, params_to_fit, pl_to_plot=1, nintg=41, zerotime=0, nplot=100,
+                      use_flux_f=False, use_icut=False, ntt=-1, tobs=-1, omc=-1):
     """
     Plots a random selection of models from the chain.
 
@@ -176,6 +178,7 @@ def plotChainsTransit(phot, chain, burnin, sol, params_to_fit, zerotime=0, nplot
     burnin: Markov chain burnin
     sol: Transit model object containing the initial guess. Used to recreate the full solution
     params_to_fit: List of parameters used for the mcmc fitting
+    pl_to_plot: Index of planet to plot. 1 being the first planet
     zerotime: Offset to start time at 0
     nplot: Number of models to plot
     """
@@ -194,57 +197,83 @@ def plotChainsTransit(phot, chain, burnin, sol, params_to_fit, zerotime=0, nplot
         flux = phot.flux[icut == 0]
     itime = phot.itime[icut == 0]
 
-    nmcmc = chain.shape[0]
-
-    best_sol = getParams(chain, burnin, sol, params_to_fit)
-    t0 = best_sol.t0[0]
-    per = best_sol.per[0]
-
-    # Fold the time array and sort it. Handle TTVs
-    ph1 = t0/per - np.floor(t0/per)
-    b_phase = np.empty(len(time))
-    for i, x in enumerate(time):
-        ttcor = 0
-        t = x - ttcor
-        b_phase[i] = (t/per - np.floor(t/per) - ph1) * per*24
+    pl_to_plot -= 1 # Shift indexing to start at 0
 
     plt.figure(figsize=(12,6))
-    plt.scatter(b_phase, flux, c="blue", s=100, alpha=0.35, edgecolors="none")
 
     for i in range(nplot):
 
-        nchain = np.random.randint(burnin, nmcmc)
+        nchain = np.random.randint(burnin, chain.shape[0])
 
         # Get parameters
         sol_chain = getParams(chain[nchain,:].reshape((1,chain.shape[1])), 0, sol, params_to_fit)
 
-        t0 = sol_chain.t0[0]
-        per = sol_chain.per[0]
+        t0 = sol_chain.t0[pl_to_plot]
+        per = sol_chain.per[pl_to_plot]
 
         # Fold the time array and sort it. Handle TTVs
         ph1 = t0/per - np.floor(t0/per)
         phase = np.empty(len(time))
         for i, x in enumerate(time):
-            ttcor = 0
+            if type(ntt) is not int and ntt[pl_to_plot] > 0:
+                ttcor = ttv_lininterp(tobs, omc, ntt, x, pl_to_plot)
+            else:
+                ttcor = 0
             t = x - ttcor
             phase[i] = (t/per - np.floor(t/per) - ph1) * per*24
 
-        tmodel = transitm.transitModel(sol_chain, time, itime=itime)
+        tmodel = transitm.transitModel(sol_chain, time, itime, nintg, ntt, tobs, omc)
 
         i_sort = np.argsort(phase)
         phase_sorted = phase[i_sort]
         model_sorted = tmodel[i_sort]
         plt.plot(phase_sorted, model_sorted, c="red", alpha=0.1)
 
-    b_tmodel = transitm.transitModel(best_sol, time, itime=itime)
+    # Get best solution
+    best_sol = getParams(chain, burnin, sol, params_to_fit)
+    t0 = best_sol.t0[pl_to_plot]
+    per = best_sol.per[pl_to_plot]
+
+    # Fold the time array and sort it. Handle TTVs
+    ph1 = t0/per - np.floor(t0/per)
+    b_phase = np.empty(len(time))
+    for i, x in enumerate(time):
+        if type(ntt) is not int and ntt[pl_to_plot] > 0:
+            ttcor = ttv_lininterp(tobs, omc, ntt, x, pl_to_plot)
+        else:
+            ttcor = 0
+        t = x - ttcor
+        b_phase[i] = (t/per - np.floor(t/per) - ph1) * per*24
+
+    # Copy the original Rp/R* before modifying it
+    rdr = best_sol.rdr.copy()
+
+    # Remove the other planets from the model
+    for i in range(best_sol.npl):
+        if i != pl_to_plot:
+            best_sol.rdr[i] = 0
+
+    b_tmodel = transitm.transitModel(best_sol, time, itime, nintg, ntt, tobs, omc)
+
+    # Second model with only the other planets to substract
+    best_sol.rdr = rdr.copy()
+    best_sol.rdr[pl_to_plot] = 0
+    tmodel2 = transitm.transitModel(best_sol, time, itime, nintg, ntt, tobs, omc)
+
+    # Restore the original Rp/R*
+    best_sol.rdr = rdr
+
     i_sort = np.argsort(b_phase)
     phase_sorted = b_phase[i_sort]
     model_sorted = b_tmodel[i_sort]
 
     stdev = np.std(flux - b_tmodel)
-    tdur = kep.transitDuration(sol, i_planet=0)*24
+    tdur = kep.transitDuration(best_sol, i_planet=pl_to_plot)*24
     if tdur < 0.01 or np.isnan(tdur):
         tdur = 2
+
+    # Remove the other planets
+    fplot = flux - tmodel2 + 1
 
     # Find bounds of plot
     i1, i2 = np.searchsorted(phase_sorted, (-tdur, tdur))
@@ -259,6 +288,7 @@ def plotChainsTransit(phot, chain, burnin, sol, params_to_fit, zerotime=0, nplot
         y1 = min(flux)
         y2 = max(flux)
 
+    plt.scatter(b_phase, fplot, c="blue", s=100, alpha=0.35, edgecolors="none")
     plt.xlabel('Phase (hours)')
     plt.ylabel('Relative Flux')
     plt.axis((-1.5*tdur, 1.5*tdur, y1, y2))
