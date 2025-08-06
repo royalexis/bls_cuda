@@ -15,11 +15,12 @@ var_to_ind = {
     "ecw": 12, "esw": 13, "krv": 14, "ted": 15, "ell": 16, "alb": 17
 }
 
+st_params = ["rho", "nl1", "nl2", "nl3", "nl4", "dil", "vof", "zpt"]
 pl_params = ["t0", "per", "bb", "rdr", "ecw", "esw", "krv", "ted", "ell", "alb"]
 
 # Number of parameters of each type
-nb_st_param = 8
-nb_pl_param = 10
+nb_st_param = len(st_params)
+nb_pl_param = len(pl_params)
 
 class transit_model_class:
     """
@@ -47,89 +48,65 @@ class transit_model_class:
         self.ell = [0.0]    # Ellipsodial variations (ppm)
         self.alb = [0.0]    # Albedo amplitude (ppm)
     
-    def load_errors(self, err_arr):
-        """
-        Load errors from 1D array. Array has to have a length of (8+10*n) where n is the nb of planets
-        """
-        if (len(err_arr) - nb_st_param) % nb_pl_param != 0:
+    def _load_array(self, arr, prefix):
+        if (len(arr) - nb_st_param) % nb_pl_param != 0:
             print("Error array doesn't have the right length")
             return
+        
+        self.npl = (len(arr) - nb_st_param) // nb_pl_param
 
-        self.npl = (len(err_arr) - nb_st_param) // nb_pl_param
+        # Load stellar parameters
+        for i in range(nb_st_param):
+            setattr(self, prefix + st_params[i], arr[i])
 
-        self.drho, self.dnl1, self.dnl2, self.dnl3, self.dnl4, self.ddil, self.dvof, self.dzpt = err_arr[:nb_st_param]
+        # Load planet parameters
+        for i in range(nb_pl_param):
+            setattr(self, prefix + pl_params[i], [None]*self.npl)
+        
+        for j in range(self.npl):
+            for i in range(nb_pl_param):
+                param_list = getattr(self, prefix + pl_params[i])
+                param_list[j] = arr[nb_st_param + i + j*nb_pl_param]
 
-        self.dt0, self.dper, self.dbb, self.drdr, self.decw, self.desw, \
-                    self.dkrv, self.dted, self.dell, self.dalb = ([None]*self.npl for i in range(nb_pl_param))
+    def load_errors(self, err_arr):
+        """
+        Load errors from 1D array. Array has to have a length of (8+10*n) where n is the nb of planets.
+        The errors will have the name "d+param". For example, the error of "zpt" is "dzpt".
+        """
+        self._load_array(err_arr, prefix="d")
 
-        for i in range(self.npl):
-            self.dt0[i]  = err_arr[nb_pl_param*i + nb_st_param + 0]
-            self.dper[i] = err_arr[nb_pl_param*i + nb_st_param + 1]
-            self.dbb[i]  = err_arr[nb_pl_param*i + nb_st_param + 2]
-            self.drdr[i] = err_arr[nb_pl_param*i + nb_st_param + 3]
-            self.decw[i] = err_arr[nb_pl_param*i + nb_st_param + 4]
-            self.desw[i] = err_arr[nb_pl_param*i + nb_st_param + 5]
-            self.dkrv[i] = err_arr[nb_pl_param*i + nb_st_param + 6]
-            self.dted[i] = err_arr[nb_pl_param*i + nb_st_param + 7]
-            self.dell[i] = err_arr[nb_pl_param*i + nb_st_param + 8]
-            self.dalb[i] = err_arr[nb_pl_param*i + nb_st_param + 9]
-
-    def from_array(self, sol):
+    def from_array(self, arr):
         """
         Load parameters from 1D array. Array has to have a length of (8+10*n) where n is the nb of planets
         """
-        if (len(sol) - nb_st_param) % nb_pl_param != 0:
-            print("Parameters array doesn't have the right length")
-            return
+        self._load_array(arr, prefix="")
 
-        self.npl = (len(sol) - nb_st_param) // nb_pl_param
+    def _to_array(self, prefix):
+        len_array = nb_st_param + self.npl*nb_pl_param
+        arr = np.zeros(len_array)
 
-        self.rho, self.nl1, self.nl2, self.nl3, self.nl4, self.dil, self.vof, self.zpt = sol[:nb_st_param]
+        # Stellar parameters
+        for i in range(nb_st_param):
+            arr[i] = getattr(self, prefix + st_params[i])
 
-        self.t0, self.per, self.bb, self.rdr, self.ecw, self.esw, \
-                    self.krv, self.ted, self.ell, self.alb = ([None]*self.npl for i in range(nb_pl_param))
+        # Planet parameters
+        for j in range(self.npl):
+            for i in range(nb_pl_param):
+                arr[nb_st_param + i + j*nb_pl_param] = getattr(self, prefix + pl_params[i])[j]
 
-        for i in range(self.npl):
-            self.t0[i]  = sol[nb_pl_param*i + nb_st_param + 0]
-            self.per[i] = sol[nb_pl_param*i + nb_st_param + 1]
-            self.bb[i]  = sol[nb_pl_param*i + nb_st_param + 2]
-            self.rdr[i] = sol[nb_pl_param*i + nb_st_param + 3]
-            self.ecw[i] = sol[nb_pl_param*i + nb_st_param + 4]
-            self.esw[i] = sol[nb_pl_param*i + nb_st_param + 5]
-            self.krv[i] = sol[nb_pl_param*i + nb_st_param + 6]
-            self.ted[i] = sol[nb_pl_param*i + nb_st_param + 7]
-            self.ell[i] = sol[nb_pl_param*i + nb_st_param + 8]
-            self.alb[i] = sol[nb_pl_param*i + nb_st_param + 9]
+        return arr
 
     def to_array(self):
         """
         Return a 1D array that _transitModel() can read, since it is a numba function
         """
-        len_array = nb_st_param + self.npl*nb_pl_param
-        sol = np.zeros(len_array)
-
-        sol[:nb_st_param] = self.rho, self.nl1, self.nl2, self.nl3, self.nl4, self.dil, self.vof, self.zpt
-
-        for i in range(self.npl):
-            sol[nb_pl_param*i+nb_st_param : nb_pl_param*i+nb_pl_param+nb_st_param] = self.t0[i], self.per[i], \
-                    self.bb[i], self.rdr[i], self.ecw[i], self.esw[i], self.krv[i], self.ted[i], self.ell[i], self.alb[i]
-            
-        return sol
+        return self._to_array(prefix="")
     
     def err_to_array(self):
         """
         Return a 1D array containing errors on parameters
         """
-        len_array = nb_st_param + self.npl*nb_pl_param
-        serr = np.zeros(len_array)
-
-        serr[:nb_st_param] = self.drho, self.dnl1, self.dnl2, self.dnl3, self.dnl4, self.ddil, self.dvof, self.dzpt
-
-        for i in range(self.npl):
-            serr[nb_pl_param*i+nb_st_param : nb_pl_param*i+nb_pl_param+nb_st_param] = self.dt0[i], self.dper[i], \
-                    self.dbb[i], self.drdr[i], self.decw[i], self.desw[i], self.dkrv[i], self.dted[i], self.dell[i], self.dalb[i]
-            
-        return serr
+        return self._to_array(prefix="d")
     
     def __setattr__(self, name, value):
         """
