@@ -327,18 +327,17 @@ def _transitModel(sol, time, itime, nintg, ntt, tobs, omc):
                 
                 # Eclipse
                 else:
-                    bp = bt/Rp_Rs
-                    # Treat the star as the object blocking the light
-                    occult = occ.occultUniform(bp, 1/Rp_Rs)
-                    
-                    if Rp_Rs < 0:
-                        ratio = np.zeros(nintg)
+                    # Optimize if eclipse is not calculated
+                    if ted == 0 or Rp_Rs < 0:
+                        occult = np.ones(nintg)
                     else:
-                        ratio = 1 - occult
+                        bp = bt/Rp_Rs
+                        # Treat the star as the object blocking the light
+                        occult = occ.occultUniform(bp, 1/Rp_Rs)
 
                     tm = 0
                     for j in range(nintg):
-                        tm += 1 - ted*ratio[j] - vt[j]/Cs + tide[j] + alb[j]
+                        tm += 1 - ted*(1 - occult[j]) - vt[j]/Cs + tide[j] + alb[j]
 
                     tm = tm/nintg
 
