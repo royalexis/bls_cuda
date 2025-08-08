@@ -146,7 +146,7 @@ def transitModel(sol, time, itime=-1, nintg=41, ntt=-1, tobs=-1, omc=-1):
     # Handle integration time
     if isinstance(itime, (float, int)):
         if itime < 0:
-            itime = np.full(nb_pts, 0.020434) # 30 minutes integration time
+            itime = np.full(nb_pts, 0.5/24) # 30 minutes integration time
         else:
             itime = np.full(nb_pts, float(itime))
 
@@ -258,7 +258,10 @@ def _transitModel(sol, time, itime, nintg, ntt, tobs, omc):
             for j in range(nintg):
                 
                 # Time-Convolution
-                t = time_i - itime_i * (0.5 - 1/(2*nintg) - j/nintg) - epoch - ttcor
+                if nintg == 1:
+                    t = time_i - epoch - ttcor
+                else:
+                    t = time_i - itime_i/2 + itime_i*j/(nintg-1) - epoch - ttcor
 
                 phi = t/Per - np.floor(t/Per)
                 Manom = phi * 2*np.pi + phi0
