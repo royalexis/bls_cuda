@@ -109,7 +109,7 @@ def occultQuad(z0, u1, u2, p):
             lambdad = lambda2(p, z, k_i, a, b, q)
             if z < p:
                 lambdad += 2/3
-            if abs(p + z - 1) <= 1e-4:
+            if abs(p + z - 1) <= 1e-8:
                 lambdad = lambda5(p)
 
             etad = eta2(p, z)

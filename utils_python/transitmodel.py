@@ -50,7 +50,7 @@ class transit_model_class:
     
     def _load_array(self, arr, prefix):
         if (len(arr) - nb_st_param) % nb_pl_param != 0:
-            print("Error array doesn't have the right length")
+            print("Array doesn't have the right length")
             return
         
         self.npl = (len(arr) - nb_st_param) // nb_pl_param

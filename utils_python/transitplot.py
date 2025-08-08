@@ -133,7 +133,10 @@ def printParams(sol):
     for key in stellarDict:
         var_name = stellarDict[key]
         val = getattr(sol, var_name)
-        err = getattr(sol, "d" + var_name)
+        try:
+            err = getattr(sol, "d" + var_name)
+        except AttributeError:
+            err = 0
 
         if val != 0:
             exponent = np.floor(np.log10(abs(val)))
@@ -154,7 +157,10 @@ def printParams(sol):
         for key in planetDict:
             var_name = planetDict[key]
             val = getattr(sol, var_name)
-            err = getattr(sol, "d" + var_name)
+            try:
+                err = getattr(sol, "d" + var_name)
+            except AttributeError:
+                err = [0]*sol.npl
 
             p_val = val[j]
             p_err = err[j]
