@@ -90,7 +90,7 @@ def occultQuad(z0, u1, u2, p):
                 etad = eta2(p, z)
 
         # Partly occults the source
-        elif (0.5 + abs(p - 0.5) < z < 1 + p) or (p > 0.5 and abs(1 - p)*1.0001 < z < p):
+        elif (0.5 + abs(p - 0.5) < z < 1 + p) or (p > 0.5 and abs(1 - p) < z < p):
             k = np.sqrt((1 - a)/(4*z*p))
             if k > 1:
                 k = 0.99999
@@ -101,7 +101,7 @@ def occultQuad(z0, u1, u2, p):
                 lambdad += 2/3
 
         # Transits the source
-        elif p <= 1 and z <= (1 - p) * 1.0001:
+        elif p <= 1 and z <= (1 - p):
             k_i = np.sqrt((b-a)/(1-a)) # k^(-1)
             if k_i > 1:
                 k_i = 0.99999

@@ -158,7 +158,7 @@ def transitModel(sol, time, itime=-1, nintg=41, ntt=-1, tobs=-1, omc=-1):
     
     return _transitModel(sol_a, time, itime, nintg, ntt, tobs, omc)
 
-@njit(parallel=True, cache=True)
+@njit(parallel=True)
 def _transitModel(sol, time, itime, nintg, ntt, tobs, omc):
     """
     Computes a transit light curve without all the input checking.
@@ -287,7 +287,10 @@ def _transitModel(sol, time, itime, nintg, ntt, tobs, omc):
 
                 vt[j] = K * (eccsw - sTanom_w)
                 tide[j] = ell * np.cbrt(d_Rs/a_Rs) * (sTanom_w*sTanom_w - cTanom_w*cTanom_w)
-                alb[j] = albedoMod(Tanom_w, ag) * a_Rs/d_Rs
+                if ag == 0:
+                    alb[j] = 0
+                else:
+                    alb[j] = albedoMod(Tanom_w, ag) * a_Rs/d_Rs
             
             if dtype[i] == 0:
                 if y2 >= 0:
@@ -298,7 +301,7 @@ def _transitModel(sol, time, itime, nintg, ntt, tobs, omc):
                             is_transit = 1
                             break
                     
-                    if is_transit:
+                    if is_transit and Rp_Rs != 0:
                         # Quadratic coefficients
                         if (c3 == 0 and c4 == 0):
                             tflux = occ.occultQuad(bt, c1, c2, Rp_Rs)
@@ -328,7 +331,7 @@ def _transitModel(sol, time, itime, nintg, ntt, tobs, omc):
                 # Eclipse
                 else:
                     # Optimize if eclipse is not calculated
-                    if ted == 0 or Rp_Rs < 0:
+                    if ted == 0 or Rp_Rs <= 0:
                         occult = np.ones(nintg)
                     else:
                         bp = bt/Rp_Rs
