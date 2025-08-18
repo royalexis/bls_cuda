@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from utils_python.transitmodel import transitModel
+from transitmodel import transitModel
 from utils_python.keplerian import transitDuration
 from utils_python.effects import ttv_lininterp
 
@@ -95,8 +95,8 @@ def plotTransit(phot, sol, pl_to_plot=1, nintg=41, zerotime=0, use_flux_f=False,
         i2 = len(model_sorted)
     ymin = min(model_sorted[i1:i2])
     ymax = max(model_sorted[i1:i2])
-    y1 = ymin - 0.1*(ymax-ymin) - 2.0*stdev
-    y2 = ymax + 0.1*(ymax-ymin) + 2.0*stdev
+    y1 = ymin - 0.1*(ymax-ymin) - 3.0*stdev
+    y2 = ymax + 0.1*(ymax-ymin) + 3.0*stdev
     if np.abs(y2 - y1) < 1.0e-10:
         y1 = min(flux)
         y2 = max(flux)

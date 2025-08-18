@@ -1,5 +1,5 @@
 import numpy as np
-import utils_python.transitmodel as transitm
+import transitmodel as transitm
 import utils_python.keplerian as kep
 import utils_python.mcmcroutines as mcmc
 from utils_python.effects import ttv_lininterp
@@ -282,8 +282,8 @@ def plotChainsTransit(phot, chain, burnin, sol, params_to_fit, pl_to_plot=1, nin
         i2 = len(model_sorted)
     ymin = min(model_sorted[i1:i2])
     ymax = max(model_sorted[i1:i2])
-    y1 = ymin - 0.1*(ymax-ymin) - 2.0*stdev
-    y2 = ymax + 0.1*(ymax-ymin) + 2.0*stdev
+    y1 = ymin - 0.1*(ymax-ymin) - 3.0*stdev
+    y2 = ymax + 0.1*(ymax-ymin) + 3.0*stdev
     if np.abs(y2 - y1) < 1.0e-10:
         y1 = min(flux)
         y2 = max(flux)

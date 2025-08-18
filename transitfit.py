@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.optimize import least_squares
-import utils_python.transitmodel as transitm
+import transitmodel as transitm
 
 def createBounds(time, id_to_fit, sol_obj):
     """
@@ -15,7 +15,7 @@ def createBounds(time, id_to_fit, sol_obj):
 
     # Rho and Rp/Rs are in log space
     lower_bound = np.array([np.log(1e-4), 0, -1, 0, 0, 0, -np.inf, -np.inf, min_t, 0, 0, -np.inf, -1, -1, -np.inf, -np.inf, -np.inf, -np.inf])
-    upper_bound = np.array([np.log(1e3), 2, 1, 1, 1, 1, np.inf, np.inf, max_t, max_t, 2, 0, 1, 1, np.inf, np.inf, np.inf, np.inf])
+    upper_bound = np.array([np.log(1e3), 2, 1, 1, 1, 1, np.inf, np.inf, max_t, np.inf, 2, 0, 1, 1, np.inf, np.inf, np.inf, np.inf])
 
     # Expand bounds for multiple planets
     for i in range(sol_obj.npl - 1):
