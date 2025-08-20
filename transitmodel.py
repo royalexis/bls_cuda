@@ -53,6 +53,7 @@ class transit_model_class:
     - Use the parameters nl1 and nl2 for quadratic limb-darkening coefficients based on *Mandel & Agol (2002)*.
     - Use nl3 and nl4 for quadratic limb-darkening but with coefficients q1 and q2 from *Kipping (2013)*.
     - Use nl1, nl2, nl3 and nl4 for non-linear limb-darkening. This uses the small planet approximation from *Mandel & Agol (2002)*.
+
     Set unused parameters to 0.
     """
     def __init__(self):
@@ -155,8 +156,8 @@ def transitModel(sol, time, itime=-1, nintg=41, ntt=-1, tobs=-1, omc=-1):
         sol (transit_model_class or ndarray):
             Transit model object or Array containing all the parameters.
             To view the list of params, see transit_model_class.
-        time (ndarray): Time array
-        itime (float or ndarray): Integration time array. Optional, defaults to 30 minutes.
+        time (ndarray): Time array (days)
+        itime (float or ndarray): Integration time array (days). Optional, defaults to 30 minutes.
         nintg (int): Number of points inside the integration time. Optional, defaults to 41.
         ntt (ndarray): 1D array containing nb of ttv. shape=(nb_planet,). Optional, defaults to no ttv
         tobs (ndarray): 2D array containing times of ttv. shape=(nb_planet, nb_ttv). Optional, defaults to no ttv
@@ -198,8 +199,8 @@ def _transitModel(sol, time, itime, nintg, ntt, tobs, omc):
 
     Args:
         sol (ndarray): Array containing all the parameters. To view the list of params, see transit_model_class
-        time (ndarray): Time array
-        itime (ndarray): Integration time array. Has to be the same length as time
+        time (ndarray): Time array (days)
+        itime (ndarray): Integration time array (days). Has to be the same length as time
         nintg (int): Number of points inside the integration time
         ntt (ndarray): 1D array containing nb of ttv. shape=(nb_planet,)
         tobs (ndarray): 2D array containing times of ttv. shape=(nb_planet, nb_ttv)
