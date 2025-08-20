@@ -7,15 +7,16 @@ from utils_python.effects import ttv_lininterp
 
 def plotTransit(phot, sol, pl_to_plot=1, nintg=41, zerotime=0, use_flux_f=False, use_icut=False, ntt=-1, tobs=-1, omc=-1):
     """
-    Plots a transit model. Assuming time is in days. Set flux=0 for no scatterplot.
+    Plots a transit model. Assuming time is in days.
 
-    phot: Phot object from reading data file
-    sol: Transit model object with parameters
-    pl_to_plot: Index of planet to plot. 1 being the first planet
-    nintg: Number of points inside the integration time
-    zerotime: Offset to shift time to 0
-    use_flux_f: Boolean. Use preconditionned data or not
-    use_icut: Boolean. Use phot.icut or not
+    Args:
+        phot (phot_class): Phot object from reading data file
+        sol (transit_model_class): Transit model object with parameters
+        pl_to_plot (int): Index of planet to plot. 1 being the first planet. Optional, defaults to 1
+        nintg (int): Number of points inside the integration time. Optional, defaults to 41.
+        zerotime (float): Offset to shift time to 0. Optional, defaults to 0.
+        use_flux_f (bool): Use preconditionned data (phot.flux_f) or not. Optional, defaults to False
+        use_icut (bool): Use phot.icut or not. Optional, defaults to False
     """
 
     # Handle bad data cut
@@ -115,7 +116,8 @@ def printParams(sol):
     """
     Prints the parameters in a nice way.
 
-    sol: Transit model object containing the parameters to print
+    Args:
+        sol (transit_model_class): Transit model object containing the parameters to print
     """
 
     stellarDict = {

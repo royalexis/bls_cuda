@@ -28,17 +28,19 @@ def fitTransitModel(sol_obj, params_to_fit, phot, nintg=41, zerotime=0, use_flux
     """
     Function to call for fitting
 
-    sol_obj: Transit model object with initial parameters
-    params_to_fit: List containing strings of the names of the parameters to fit according to the tm class
-    phot: Phot object from reading data file
-    zerotime: Offset to shift time to 0
-    use_flux_f: Boolean. Use preconditionned data or not
-    use_icut: Boolean. Use phot.icut or not
-    ntt: 1D array containing nb of ttv. shape=(nb_planet,)
-    tobs: 2D array containing times of ttv. shape=(nb_planet, nb_ttv)
-    omc: 2D array of o-c. shape=(nb_planet, nb_ttv)
+    Args:
+        sol_obj (transit_model_class): Transit model object with initial parameters
+        params_to_fit (list or ndarray): List containing strings of the names of the parameters to fit according to the tm class
+        phot (phot_class): Phot object from reading data file
+        zerotime (float): Offset to shift time to 0. Optional, defaults to 0
+        use_flux_f (bool): Use preconditionned data (phot.flux_f) or not. Optional, defaults to False
+        use_icut (bool): Use phot.icut or not. Optional, defaults to False
+        ntt (ndarray): 1D array containing nb of ttv. shape=(nb_planet,). Optional, defaults to no ttv
+        tobs (ndarray): 2D array containing times of ttv. shape=(nb_planet, nb_ttv). Optional, defaults to no ttv
+        omc (ndarray): 2D array of o-c. shape=(nb_planet, nb_ttv). Optional, defaults to no ttv
 
-    return: New transit model object containing the parameters and errors after fitting
+    Returns:
+        sol_fit (transit_model_class): New transit model object containing the parameters and errors after fitting
     """
 
     n_planet = sol_obj.npl

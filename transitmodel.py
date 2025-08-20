@@ -25,6 +25,35 @@ nb_pl_param = len(pl_params)
 class transit_model_class:
     """
     Class containing all the transit model parameters
+
+    Stellar Parameters:
+        rho (float): Mean stellar density (g/cm^3)
+        nl1 (float): Limb-Darkening coefficient
+        nl2 (float): Limb-Darkening coefficient
+        nl3 (float): Limb-Darkening coefficient
+        nl4 (float): Limb-Darkening coefficient
+        dil (float): Dilution. Goes from 0 to 1
+        vof (float): Velocity offset for Radial Velocity
+        zpt (float): Photometric zero point
+        npl (int): Number of planets
+
+    Planet parameters (Use a list if npl > 1):
+        t0 (float): Center of transit (days)
+        per (float): Orbital period (days)
+        bb (float): Impact parameter (Not the square of b)
+        rdr (float): Rp/R*
+        ecw (float): sqrt(e)cos(w)
+        esw (float): sqrt(e)sin(w)
+        krv (float): RV amplitude (m/s) for Radial Velocity
+        ted (float): Thermal eclipse depth (ppm)
+        ell (float): Ellipsoidal variations (ppm)
+        alb (float): Albedo amplitude (ppm)
+
+    Note on Limb-Darkening coefficients (LDC):
+    - Use the parameters nl1 and nl2 for quadratic limb-darkening coefficients based on *Mandel & Agol (2002)*.
+    - Use nl3 and nl4 for quadratic limb-darkening but with coefficients q1 and q2 from *Kipping (2013)*.
+    - Use nl1, nl2, nl3 and nl4 for non-linear limb-darkening. This uses the small planet approximation from *Mandel & Agol (2002)*.
+    Set unused parameters to 0.
     """
     def __init__(self):
 
@@ -45,7 +74,7 @@ class transit_model_class:
         self.esw = [0.0]    # sqrt(e)sin(w)
         self.krv = [0.0]    # RV amplitude (m/s)
         self.ted = [0.0]    # Thermal eclipse depth (ppm)
-        self.ell = [0.0]    # Ellipsodial variations (ppm)
+        self.ell = [0.0]    # Ellipsoidal variations (ppm)
         self.alb = [0.0]    # Albedo amplitude (ppm)
     
     def _load_array(self, arr, prefix):
@@ -122,15 +151,19 @@ def transitModel(sol, time, itime=-1, nintg=41, ntt=-1, tobs=-1, omc=-1):
     """
     Computes a transit light curve.
 
-    sol: Array or transit model object containing all the parameters. To view the list of params, see transit_model_class
-    time: Time array
-    itime: Integration time array. Optional, defaults to 30 minutes.
-    nintg: Number of points inside the integration time. Optional, defaults to 41.
-    ntt: 1D array containing nb of ttv. shape=(nb_planet,)
-    tobs: 2D array containing times of ttv. shape=(nb_planet, nb_ttv)
-    omc: 2D array of o-c. shape=(nb_planet, nb_ttv)
+    Args:
+        sol (transit_model_class or ndarray):
+            Transit model object or Array containing all the parameters.
+            To view the list of params, see transit_model_class.
+        time (ndarray): Time array
+        itime (float or ndarray): Integration time array. Optional, defaults to 30 minutes.
+        nintg (int): Number of points inside the integration time. Optional, defaults to 41.
+        ntt (ndarray): 1D array containing nb of ttv. shape=(nb_planet,). Optional, defaults to no ttv
+        tobs (ndarray): 2D array containing times of ttv. shape=(nb_planet, nb_ttv). Optional, defaults to no ttv
+        omc (ndarray): 2D array of o-c. shape=(nb_planet, nb_ttv). Optional, defaults to no ttv
 
-    return: Array containing the flux values. Same length as the time array
+    Returns:
+        tmodel (ndarray): Array containing the flux values. Same length as the time array
     """
 
     # Handle parameters
@@ -163,15 +196,17 @@ def _transitModel(sol, time, itime, nintg, ntt, tobs, omc):
     """
     Computes a transit light curve without all the input checking.
 
-    sol: Array containing all the parameters. To view the list of params, see transit_model_class
-    time: Time array
-    itime: Integration time array. Has to be the same length as time
-    nintg: Number of points inside the integration time
-    ntt: 1D array containing nb of ttv. shape=(nb_planet,)
-    tobs: 2D array containing times of ttv. shape=(nb_planet, nb_ttv)
-    omc: 2D array of o-c. shape=(nb_planet, nb_ttv)
+    Args:
+        sol (ndarray): Array containing all the parameters. To view the list of params, see transit_model_class
+        time (ndarray): Time array
+        itime (ndarray): Integration time array. Has to be the same length as time
+        nintg (int): Number of points inside the integration time
+        ntt (ndarray): 1D array containing nb of ttv. shape=(nb_planet,)
+        tobs (ndarray): 2D array containing times of ttv. shape=(nb_planet, nb_ttv)
+        omc (ndarray): 2D array of o-c. shape=(nb_planet, nb_ttv)
 
-    return: Array containing the flux values. Same length as the time array
+    Returns:
+        tmodel (ndarray): Array containing the flux values. Same length as the time array
     """
 
     # Reading parameters
